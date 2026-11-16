@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+out/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 비밀 정보 (절대 커밋 금지)
+application-local.yml
+*.pem
+.env
+*.env

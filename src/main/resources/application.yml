@@ -1,0 +1,8 @@
+# 공통 설정 (모든 환경)
+spring:
+  jackson:
+    time-zone: Asia/Seoul
+
+cors:
+  # 로컬 기본값. 운영은 application-prod.yml에서 환경변수로 덮어쓴다.
+  allowed-origins: http://localhost:5173,http://localhost:3000
