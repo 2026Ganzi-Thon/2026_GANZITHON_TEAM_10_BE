@@ -8,7 +8,7 @@ All endpoints use CurrentUserProvider, not a userId supplied by the client. Head
 
 | Method | Path | Request | Response data |
 |---|---|---|---|
-| POST | /api/records | `{ "recordId": 501 }` | `{recordId,recordDate,completedAt,sheepEarned,sheepBalance}` (201) |
+| POST | /api/records | `{ "recordId": 501, "title": "오늘의 회고 제목" }` | `{recordId,recordDate,completedAt,sheepEarned,sheepBalance}` (201) |
 | GET | /api/records/today | none | `{completed,recordId,recordDate}` |
 | GET | /api/records | date optional yyyy-MM-dd, cursor optional positive recordId, size 1–50 default20 | `{items:[{recordId,recordDate,title,imageUrl,completedAt}],nextCursor,hasNext}` |
 | GET | /api/records/{recordId} | none | `{recordId,recordDate,imageUrl,drawingDescription,analysis:{mainElements,spatialComposition,lineExpression,emotionMeaning},messages:[{sequenceNo,role,content,sentAt}],completedAt,title}` |
@@ -21,22 +21,22 @@ Except DELETE, success uses the existing `ApiResponse {success,data,error}`. Err
 
 - Drawing calls RecordPort.create(userId) inside upload transaction. The adapter generates a DB identity recordId in IN_PROGRESS. Upload rollback rolls back creation.
 - AI calls RecordPort.cardReady(recordId). A finished/deleted record cannot be reopened by this signal.
-- POST accepts only recordId. Client cannot supply authoritative analysis/owner/reward values.
+- POST accepts recordId and the user's required title (1–500 characters). The client cannot supply authoritative image/analysis/messages, owner, or reward values.
 - Completion requires CARD_READY plus a validated server-side source snapshot. Frozen source data and Sheep award are saved in one transaction. Repeated completion returns original completion info with sheepEarned=0 and current balance, even if reader has become unavailable.
 - Records captures one Seoul completion time and passes it to the added internal `SheepService.awardRecordAt(userId,recordId,completedAt)` method. Record date and reward day remain equal even when wallet locking crosses midnight. The original `awardRecord` contract remains available for existing callers. Neither method accepts a client-provided timestamp.
 - Multiple completions/day allowed. First new completed record per Asia/Seoul day pays1, later ones0, using existing Sheep rules (including demo override). No DAILY_RECORD_ALREADY_EXISTS error.
 - Deletion is soft, does not refund/remove earned Sheep or remove reward decisions. Deleted records cannot be restored by save/cardReady. Original drawing/AI rows/files are not deleted here.
 - today means a nondeleted completion exists today, not permission to save. Deleted-all today can return false while the daily reward remains consumed.
 - list sorts completedAt DESC,id DESC, filters out unfinished/deleted records. Cursor is an owned previously completed recordId (deleted cursor remains usable). Calendar uses the same completion order per date; deleting latest reveals previous completion.
-- recordDate is final-save date in Seoul. title is the AI-generated record title, independent of the selected topic. A missing/blank AI title or title over 500 characters is not ready for completion. Separate legacy whatISaid/thoughts/todaysStory are not part of this agreed detail response.
+- recordDate is final-save date in Seoul. title is supplied by the user during completion, independent of the selected topic. Blank or over-500-character titles are rejected. Saved records do not have a title-edit endpoint. Separate legacy whatISaid/thoughts/todaysStory are not part of this agreed detail response.
 
 ## Required drawing/AI connection
 
 Implement `RecordSnapshotReader.find(recordId)` as a Spring bean in the source domain. Return Optional.empty for missing source; no bean yields503, missing/incomplete source yields409. No production fallback fabricates data.
 
-Snapshot: recordId,userId,ready,title,imageUrl,drawingDescription,analysis,messages. ready means conversation ended and the AI-generated title plus all four analysis fields are persisted. Provider must return a consistent source snapshot; it must not call RecordPort again or take locks in reverse order. No network/AI call during this read transaction.
+Snapshot: recordId,imageUrl,drawingDescription,analysis,messages. The user's title comes from POST and is saved with the snapshot. Records ownership and readiness come from its own ReflectionRecord (owner and CARD_READY status). Provider must return a consistent source snapshot; it must not call RecordPort again or take locks in reverse order. No network/AI call during this read transaction.
 
-Source lookup: DrawingRepository.findByRecordId; ConversationRepository.findByRecordId; messages by conversationId ordered id ascending; AI-generated title and analysis via their persisted source fields (not TopicReader or topicTitle). Convert source role into USER/ASSISTANT. Normalize SKIP/DONT_KNOW into their display text and assign sequenceNo 1..N without gaps; preserve original message timestamps (OffsetDateTime). Return all original messages, not whatISaid summary. Analysis strings must be nonblank. The adapter validates identity and required fields again.
+Source lookup: DrawingRepository.findByRecordId; ConversationRepository.findByRecordId; messages by conversationId ordered id ascending; analysis via its persisted source fields (not TopicReader or topicTitle). Convert source role into USER/ASSISTANT. Normalize SKIP/DONT_KNOW into their display text and assign sequenceNo 1..N without gaps; preserve original message timestamps (OffsetDateTime). Return all original messages, not whatISaid summary. Analysis fields may be null when unsupported by the conversation. The adapter validates identity and required fields again.
 
 Current drawing/AI branch has drawing, conversation and messages, but does not generate/store the required four analysis sections. This branch therefore supplies the contract only; real source integration is still needed. Tests use an explicitly test-only provider and cannot establish actual AI integration success.
 

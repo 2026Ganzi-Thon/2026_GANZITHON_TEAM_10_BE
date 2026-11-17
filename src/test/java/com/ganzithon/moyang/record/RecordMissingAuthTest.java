@@ -22,7 +22,7 @@ class RecordMissingAuthTest {
     @Test void absentRealSnapshotProviderFailsExplicitly() {
         long id=records.create(100);
         records.cardReady(id);
-        assertThatThrownBy(()->records.complete(100,id)).isInstanceOfSatisfying(BusinessException.class,
+        assertThatThrownBy(()->records.complete(100,id,"제목")).isInstanceOfSatisfying(BusinessException.class,
             e->assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECORD_SOURCE_UNAVAILABLE));
     }
     @Test void noUserProviderRejectsRecordsAccess() throws Exception {

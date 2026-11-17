@@ -30,10 +30,13 @@ public class ReflectionRecord {
     protected ReflectionRecord() {}
     public ReflectionRecord(long userId, LocalDateTime now) {this.userId=userId;createdAt=now;}
     public void cardReady() {if(status==Status.IN_PROGRESS)status=Status.CARD_READY;}
-    public void complete(Snapshot data, LocalDateTime now) {
-        title=data.title(); imageUrl=data.imageUrl(); drawingDescription=data.drawingDescription();
-        mainElements=data.analysis().mainElements(); spatialComposition=data.analysis().spatialComposition();
-        lineExpression=data.analysis().lineExpression(); emotionMeaning=data.analysis().emotionMeaning();
+    public void complete(Snapshot data, String title, LocalDateTime now) {
+        this.title=title; imageUrl=data.imageUrl(); drawingDescription=data.drawingDescription();
+        Analysis analysis=data.analysis();
+        mainElements=analysis==null?null:analysis.mainElements();
+        spatialComposition=analysis==null?null:analysis.spatialComposition();
+        lineExpression=analysis==null?null:analysis.lineExpression();
+        emotionMeaning=analysis==null?null:analysis.emotionMeaning();
         messages.clear(); data.messages().forEach(m->messages.add(new RecordMessage(m)));
         completedAt=now;recordDate=now.toLocalDate();status=Status.COMPLETED;
     }

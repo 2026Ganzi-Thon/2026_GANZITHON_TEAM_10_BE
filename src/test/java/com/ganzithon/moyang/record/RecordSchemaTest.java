@@ -28,7 +28,7 @@ class RecordSchemaTest {
  @Autowired RecordService records;
  @Test void suppliedSqlMapsRecordMessagesAndReward(){
   long id=records.create(88);records.cardReady(id);
-  assertThat(records.complete(88,id).sheepEarned()).isEqualTo(1);
+  assertThat(records.complete(88,id,"직접 입력한 제목").sheepEarned()).isEqualTo(1);
   assertThat(records.detail(88,id).messages()).hasSize(1);
  }
  @Configuration(proxyBeanMethods=false) @Profile("records-schema-only")
@@ -37,6 +37,6 @@ class RecordSchemaTest {
  @EnableJpaRepositories(basePackageClasses={RecordRepository.class,SheepWalletRepository.class})
  @Import({RecordService.class,SheepService.class,com.ganzithon.moyang.sheep.config.SheepConfiguration.class})
  static class SchemaConfig {
-  @Bean RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,88,true,"topic","url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.now()))));}
+  @Bean RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,"url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.now()))));}
  }
 }

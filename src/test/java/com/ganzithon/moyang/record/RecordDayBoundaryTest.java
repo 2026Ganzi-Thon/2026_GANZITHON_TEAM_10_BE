@@ -20,11 +20,11 @@ class RecordDayBoundaryTest {
  @Autowired RecordService records; @Autowired BoundaryClock clock; @Autowired JdbcTemplate jdbc;
  @Test void rewardDayMatchesCompletionEvenWhenWalletOperationCrossesMidnight(){
   long id=records.create(777);records.cardReady(id);clock.arm();
-  var saved=records.complete(777,id);
+  var saved=records.complete(777,id,"오늘의 회고");
   assertThat(saved.recordDate()).isEqualTo(LocalDate.of(2026,11,4));
   assertThat(jdbc.queryForObject("select reward_date from sheep_transactions where user_id=777",LocalDate.class)).isEqualTo(saved.recordDate());
   long next=records.create(777);records.cardReady(next);
-  assertThat(records.complete(777,next).sheepEarned()).isEqualTo(1);
+  assertThat(records.complete(777,next,"다음 회고").sheepEarned()).isEqualTo(1);
  }
  static class BoundaryClock extends Clock {
   final AtomicInteger calls=new AtomicInteger();boolean armed;
@@ -35,6 +35,6 @@ class RecordDayBoundaryTest {
  }
  @TestConfiguration static class Config {
   @Bean @Primary BoundaryClock boundaryClock(){return new BoundaryClock();}
-  @Bean RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,777,true,"topic","url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.parse("2026-11-04T23:58:00+09:00")))));}
+  @Bean RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,"url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.parse("2026-11-04T23:58:00+09:00")))));}
  }
 }

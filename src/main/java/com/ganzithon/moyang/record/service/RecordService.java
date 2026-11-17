@@ -30,16 +30,18 @@ public class RecordService {
     }
     @Transactional public long create(long userId){positive(userId);return repository.saveAndFlush(new ReflectionRecord(userId,now())).getId();}
     @Transactional public void cardReady(long recordId){positive(recordId);var r=lock(recordId);r.cardReady();}
-    @Transactional public SaveResponse complete(long userId,long recordId){
+    @Transactional public SaveResponse complete(long userId,long recordId,String title){
         positive(userId);positive(recordId);
+        String normalizedTitle=title==null?null:title.strip();
+        if(blank(normalizedTitle)||normalizedTitle.length()>500)throw error(ErrorCode.INVALID_REQUEST);
         var r=owned(userId,Optional.of(lock(recordId)));
         if(r.getStatus()==Status.COMPLETED)return new SaveResponse(r.getId(),r.getRecordDate(),r.completedOffset(),0,sheep.balance(userId).balance());
         if(r.getStatus()!=Status.CARD_READY)throw error(ErrorCode.RECORD_NOT_READY);
         var reader=readers.getIfAvailable();if(reader==null)throw error(ErrorCode.RECORD_SOURCE_UNAVAILABLE);
         var data=reader.find(recordId).orElseThrow(()->error(ErrorCode.RECORD_NOT_READY));
-        validate(data,userId,recordId);
+        validate(data,recordId);
         var completedAt=now();
-        r.complete(data,completedAt);repository.flush();
+        r.complete(data,normalizedTitle,completedAt);repository.flush();
         var award=sheep.awardRecordAt(userId,recordId,completedAt);
         return new SaveResponse(recordId,r.getRecordDate(),r.completedOffset(),award.sheepEarned(),award.sheepBalance());
     }
@@ -64,10 +66,9 @@ public class RecordService {
         entityManager.refresh(record,LockModeType.PESSIMISTIC_WRITE);
         return record;
     }
-    private void validate(Snapshot s,long uid,long id){
-        if(s.userId()!=uid||s.recordId()!=id)throw error(ErrorCode.FORBIDDEN);
-        if(!s.ready()||blank(s.title())||s.title().length()>500||blank(s.imageUrl())||s.imageUrl().length()>2048||s.analysis()==null||s.messages()==null||s.messages().isEmpty())throw error(ErrorCode.RECORD_NOT_READY);
-        var a=s.analysis();if(blank(a.mainElements())||blank(a.spatialComposition())||blank(a.lineExpression())||blank(a.emotionMeaning()))throw error(ErrorCode.RECORD_NOT_READY);
+    private void validate(Snapshot s,long id){
+        if(s.recordId()!=id)throw error(ErrorCode.RECORD_NOT_READY);
+        if(blank(s.imageUrl())||s.imageUrl().length()>2048||s.messages()==null||s.messages().isEmpty())throw error(ErrorCode.RECORD_NOT_READY);
         int seq=1;for(var m:s.messages()){if(m==null||m.sequenceNo()!=seq++||!Set.of("USER","ASSISTANT").contains(m.role()==null?"":m.role())||blank(m.content())||m.sentAt()==null)throw error(ErrorCode.RECORD_NOT_READY);}
     }
     private static boolean blank(String s){return s==null||s.isBlank();}
