@@ -77,6 +77,7 @@ class ConversationFlowTest {
         }
 
         @Bean
+        @Primary
         RecordPort recordPort() {
             return new RecordPort() {
                 public long create(long id) {

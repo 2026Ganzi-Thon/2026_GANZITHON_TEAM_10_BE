@@ -36,6 +36,10 @@ public enum ErrorCode {
     REFUND_NOT_ELIGIBLE(HttpStatus.CONFLICT, "환불할 양털 사용 내역이 없어요."),
     SHEEP_BALANCE_LIMIT(HttpStatus.CONFLICT, "양털 잔액 한도를 초과했어요."),
 
+    RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요."),
+    RECORD_NOT_READY(HttpStatus.CONFLICT, "회고 저장에 필요한 데이터가 아직 준비되지 않았어요."),
+    RECORD_SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "그림·AI 기록 연동이 아직 준비되지 않았어요."),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;
