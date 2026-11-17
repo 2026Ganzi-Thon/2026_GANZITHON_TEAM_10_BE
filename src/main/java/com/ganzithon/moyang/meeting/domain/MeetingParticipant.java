@@ -33,6 +33,9 @@ public class MeetingParticipant {
     @Column(nullable = false, updatable = false)
     private LocalDateTime joinedAt;
 
+    /** 신청을 취소한 시각. null이면 참여 중. 취소해도 행은 남겨 같은 모임에 다시 신청하지 못하게 한다. */
+    private LocalDateTime canceledAt;
+
     protected MeetingParticipant() {}
 
     public MeetingParticipant(long meetingId, long userId, String meetingNickname, LocalDateTime joinedAt) {
@@ -47,4 +50,11 @@ public class MeetingParticipant {
     public long getUserId() { return userId; }
     public String getMeetingNickname() { return meetingNickname; }
     public LocalDateTime getJoinedAt() { return joinedAt; }
+    public LocalDateTime getCanceledAt() { return canceledAt; }
+
+    public boolean isActive() { return canceledAt == null; }
+
+    public void cancel(LocalDateTime now) {
+        this.canceledAt = now;
+    }
 }

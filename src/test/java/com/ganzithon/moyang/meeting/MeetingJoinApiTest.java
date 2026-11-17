@@ -158,10 +158,10 @@ class MeetingJoinApiTest {
 
         // 양털 부족이면 참여도 저장되지 않는다
         Meeting open = meeting(MeetingType.LIVE, null, 4, MeetingStatus.OPEN);
-        long before = participants.countByMeetingId(open.getId());
+        long before = participants.countActiveByMeetingId(open.getId());
         join(poor, open, null).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("NOT_ENOUGH_WOOL"));
-        assertThat(participants.countByMeetingId(open.getId())).isEqualTo(before);
+        assertThat(participants.countActiveByMeetingId(open.getId())).isEqualTo(before);
 
         mvc().perform(post("/api/meetings/99999999/participants").header("Authorization", bearer(first)))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.error.code").value("MEETING_NOT_FOUND"));
@@ -218,7 +218,7 @@ class MeetingJoinApiTest {
 
         assertThat(ok).isEqualTo(3);
         assertThat(full).isEqualTo(5);
-        assertThat(participants.countByMeetingId(m.getId())).isEqualTo(4);
+        assertThat(participants.countActiveByMeetingId(m.getId())).isEqualTo(4);
         // 들어간 3명만 양털 1개를 썼다
         long spent = guests.stream().filter(g -> balance(g) == 0).count();
         assertThat(spent).isEqualTo(3);
@@ -243,6 +243,6 @@ class MeetingJoinApiTest {
         pool.shutdown();
         assertThat(codes).containsExactlyInAnyOrder(200, 409);
         assertThat(balance(guest)).isEqualTo(1);
-        assertThat(participants.countByMeetingId(m.getId())).isEqualTo(2);
+        assertThat(participants.countActiveByMeetingId(m.getId())).isEqualTo(2);
     }
 }

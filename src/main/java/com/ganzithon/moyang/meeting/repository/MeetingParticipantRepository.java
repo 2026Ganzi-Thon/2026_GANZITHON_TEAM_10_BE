@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+/** 개수·목록 조회는 기본적으로 "참여 중"(취소하지 않은) 사람만 센다. 취소한 행은 findByMeetingIdAndUserId로만 보인다. */
 public interface MeetingParticipantRepository extends JpaRepository<MeetingParticipant, Long> {
 
     interface MeetingCount {
@@ -15,15 +16,19 @@ public interface MeetingParticipantRepository extends JpaRepository<MeetingParti
         Long getCnt();
     }
 
-    long countByMeetingId(long meetingId);
+    @Query("select count(p) from MeetingParticipant p where p.meetingId = :meetingId and p.canceledAt is null")
+    long countActiveByMeetingId(long meetingId);
 
+    /** 취소한 사람도 포함해서 찾는다(재신청 막기용). */
     Optional<MeetingParticipant> findByMeetingIdAndUserId(long meetingId, long userId);
 
-    List<MeetingParticipant> findByUserId(long userId);
+    List<MeetingParticipant> findByMeetingIdAndCanceledAtIsNull(long meetingId);
 
-    List<MeetingParticipant> findByMeetingIdInAndUserId(Collection<Long> meetingIds, long userId);
+    List<MeetingParticipant> findByUserIdAndCanceledAtIsNull(long userId);
+
+    List<MeetingParticipant> findByMeetingIdInAndUserIdAndCanceledAtIsNull(Collection<Long> meetingIds, long userId);
 
     @Query("select p.meetingId as meetingId, count(p) as cnt from MeetingParticipant p "
-            + "where p.meetingId in :ids group by p.meetingId")
+            + "where p.meetingId in :ids and p.canceledAt is null group by p.meetingId")
     List<MeetingCount> countByMeetingIds(Collection<Long> ids);
 }

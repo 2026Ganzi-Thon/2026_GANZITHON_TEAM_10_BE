@@ -97,8 +97,9 @@ public class MeetingQueryService {
         Meeting m = meetings.findById(meetingId).filter(x -> !x.expired(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
         MeetingStatus status = m.statusAt(now);
-        long count = participants.countByMeetingId(meetingId);
-        MeetingParticipant mine = participants.findByMeetingIdAndUserId(meetingId, userId).orElse(null);
+        long count = participants.countActiveByMeetingId(meetingId);
+        MeetingParticipant mine = participants.findByMeetingIdAndUserId(meetingId, userId)
+                .filter(MeetingParticipant::isActive).orElse(null);
         boolean isHost = m.getHostUserId() == userId;
         boolean scheduled = m.getType() == MeetingType.SCHEDULED;
         // 실시간은 바로 주제 공개, 예약은 시작(진행 중)된 뒤에 공개
@@ -121,7 +122,7 @@ public class MeetingQueryService {
 
     public MyMeetingsResponse mine(long userId) {
         LocalDateTime now = now();
-        Map<Long, MeetingParticipant> mine = participants.findByUserId(userId).stream()
+        Map<Long, MeetingParticipant> mine = participants.findByUserIdAndCanceledAtIsNull(userId).stream()
                 .collect(Collectors.toMap(MeetingParticipant::getMeetingId, Function.identity()));
         List<Meeting> found = meetings.findAllById(mine.keySet()).stream()
                 .filter(m -> ACTIVE.contains(m.getStatus()))
@@ -147,7 +148,7 @@ public class MeetingQueryService {
         if (found.isEmpty()) {
             return Set.of();
         }
-        return participants.findByMeetingIdInAndUserId(found.stream().map(Meeting::getId).toList(), userId).stream()
+        return participants.findByMeetingIdInAndUserIdAndCanceledAtIsNull(found.stream().map(Meeting::getId).toList(), userId).stream()
                 .map(MeetingParticipant::getMeetingId).collect(Collectors.toSet());
     }
 
