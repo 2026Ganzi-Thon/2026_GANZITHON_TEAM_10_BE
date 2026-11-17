@@ -19,3 +19,6 @@ application-local.yml
 *.pem
 .env
 *.env
+
+# 업로드된 그림 파일
+uploads/

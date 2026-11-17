@@ -23,6 +23,9 @@ java -jar build/libs/app.jar
 
 `src/main/resources/application-local.example.yml` 을 복사해 `application-local.yml` 로 저장하고 내 비밀번호를 넣은 뒤 `--spring.profiles.active=local` 로 실행합니다.
 `application-local.yml` 은 `.gitignore` 에 들어 있으며 **절대 커밋하지 않습니다.**
+Upstage 키 같은 비밀값은 프로젝트 루트 `.env` 에 `UPSTAGE_API_KEY=...` 로 적으면 자동으로 읽습니다 (`.env` 도 커밋 금지).
+JPA가 들어간 뒤로는 DB 없이 서버가 뜨지 않으므로, 로컬 실행은 이 방법으로 합니다. (`./gradlew build` 테스트는 H2로 돌아서 DB가 없어도 됩니다)
+local 프로필에서는 다른 담당 기능이 올라오기 전까지 `X-User-Id` 헤더로 로그인을 흉내 냅니다 (`common/port/LocalStubs`). 그 외 프로필에서는 401로 막힙니다.
 
 ### 운영 환경 변수
 
@@ -33,6 +36,8 @@ java -jar build/libs/app.jar
 | `DB_URL` | RDS 접속 주소 (`...?serverTimezone=Asia/Seoul&characterEncoding=UTF-8`) |
 | `DB_USERNAME` / `DB_PASSWORD` | RDS 계정 |
 | `CORS_ALLOWED_ORIGINS` | 허용할 프론트 주소 (쉼표로 구분) |
+| `UPSTAGE_API_KEY` | AI 그림 대화용 Upstage 키 (없으면 기본 질문 · 기본 카드로 동작) |
+| `UPLOAD_DIR` | 그림 파일 저장 폴더 (운영 필수. 재배포에도 남는 jar 밖 경로로) |
 
 ## 기술과 구조
 
