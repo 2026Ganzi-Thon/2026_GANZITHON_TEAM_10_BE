@@ -46,8 +46,10 @@ public enum ErrorCode {
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 신청한 모임이에요."),
     MEETING_NOT_JOINABLE(HttpStatus.CONFLICT, "이미 시작했거나 끝난, 신청할 수 없는 모임이에요."),
     ALREADY_CANCELED(HttpStatus.CONFLICT, "이미 취소한 모임이라 다시 신청할 수 없어요."),
-    MEETING_NOT_CANCELABLE(HttpStatus.CONFLICT, "이미 시작했거나 끝난, 취소할 수 없는 모임이에요."),
-    HOST_CANNOT_LEAVE(HttpStatus.CONFLICT, "방장은 나갈 수 없어요. 모임을 취소해 주세요."),
+    ALREADY_STARTED(HttpStatus.CONFLICT, "이미 시작했거나 끝난 모임이에요."),
+    NOT_JOINED(HttpStatus.FORBIDDEN, "신청하지 않은 모임이에요."),
+    NOT_HOST(HttpStatus.FORBIDDEN, "방장만 할 수 있어요."),
+    HOST_CANNOT_LEAVE(HttpStatus.FORBIDDEN, "방장은 나갈 수 없어요. 모임을 취소해 주세요."),
     ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");

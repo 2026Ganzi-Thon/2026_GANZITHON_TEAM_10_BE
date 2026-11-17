@@ -185,7 +185,7 @@ class MeetingCancelApiTest {
         assertThat(balance(guest)).isEqualTo(2);
         // 같은 사람이 또 취소하면 참여자가 아니다
         leave(guest, id).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("NOT_PARTICIPANT"));
+                .andExpect(jsonPath("$.error.code").value("NOT_JOINED"));
         assertThat(balance(guest)).isEqualTo(2);
     }
 
@@ -205,10 +205,10 @@ class MeetingCancelApiTest {
         long id = createMeeting(host, "LIVE", null);
         join(guest, id);
 
-        leave(host, id).andExpect(status().isConflict())
+        leave(host, id).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("HOST_CANNOT_LEAVE"));
         leave(stranger, id).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("NOT_PARTICIPANT"));
+                .andExpect(jsonPath("$.error.code").value("NOT_JOINED"));
         leave(guest, 99999999L).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("MEETING_NOT_FOUND"));
         mvc().perform(delete("/api/meetings/" + id + "/participants/me")).andExpect(status().isUnauthorized());
@@ -217,7 +217,7 @@ class MeetingCancelApiTest {
         for (MeetingStatus s : List.of(MeetingStatus.IN_PROGRESS, MeetingStatus.ENDED, MeetingStatus.CANCELED)) {
             setStatus(id, s);
             leave(guest, id).andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.error.code").value("MEETING_NOT_CANCELABLE"));
+                    .andExpect(jsonPath("$.error.code").value("ALREADY_STARTED"));
         }
         assertThat(balance(guest)).isZero();
     }
@@ -235,7 +235,7 @@ class MeetingCancelApiTest {
         cancel(host, id).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.meetingId").value(id))
                 .andExpect(jsonPath("$.data.status").value("CANCELED"))
-                .andExpect(jsonPath("$.data.refundedParticipants").value(2))
+                .andExpect(jsonPath("$.data.refundedParticipantCount").value(2))
                 .andExpect(jsonPath("$.data.hostRefunded").value(true))
                 .andExpect(jsonPath("$.data.sheepBalance").value(1));
         assertThat(balance(a)).isEqualTo(2);
@@ -261,7 +261,7 @@ class MeetingCancelApiTest {
         join(guest, id);
 
         cancel(host, id).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.refundedParticipants").value(1))
+                .andExpect(jsonPath("$.data.refundedParticipantCount").value(1))
                 .andExpect(jsonPath("$.data.hostRefunded").value(false))
                 .andExpect(jsonPath("$.data.sheepBalance").value(0));
         assertThat(balance(guest)).isEqualTo(1);
@@ -275,7 +275,7 @@ class MeetingCancelApiTest {
         join(guest, id);
 
         cancel(host, id).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.refundedParticipants").value(1))
+                .andExpect(jsonPath("$.data.refundedParticipantCount").value(1))
                 .andExpect(jsonPath("$.data.hostRefunded").value(false));
         assertThat(balance(guest)).isEqualTo(1);
         assertThat(balance(host)).isZero();
@@ -290,7 +290,7 @@ class MeetingCancelApiTest {
         leave(a, id).andExpect(status().isOk());
         assertThat(balance(a)).isEqualTo(1);
 
-        cancel(host, id).andExpect(status().isOk()).andExpect(jsonPath("$.data.refundedParticipants").value(1));
+        cancel(host, id).andExpect(status().isOk()).andExpect(jsonPath("$.data.refundedParticipantCount").value(1));
         assertThat(balance(a)).isEqualTo(1);
         assertThat(balance(b)).isEqualTo(1);
     }
@@ -301,7 +301,7 @@ class MeetingCancelApiTest {
         long id = createMeeting(host, "LIVE", null);
         join(guest, id);
 
-        cancel(guest, id).andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        cancel(guest, id).andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("NOT_HOST"));
         cancel(host, 99999999L).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("MEETING_NOT_FOUND"));
         mvc().perform(delete("/api/meetings/" + id)).andExpect(status().isUnauthorized());
@@ -309,14 +309,14 @@ class MeetingCancelApiTest {
         cancel(host, id).andExpect(status().isOk());
         // 두 번째 취소는 거절, 환불도 한 번만
         cancel(host, id).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("MEETING_NOT_CANCELABLE"));
+                .andExpect(jsonPath("$.error.code").value("ALREADY_STARTED"));
         assertThat(balance(guest)).isEqualTo(1);
 
         long started = createMeeting(user(1), "LIVE", null);
         long hostOfStarted = meetings.findById(started).orElseThrow().getHostUserId();
         setStatus(started, MeetingStatus.IN_PROGRESS);
         cancel(users.findById(hostOfStarted).orElseThrow(), started).andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("MEETING_NOT_CANCELABLE"));
+                .andExpect(jsonPath("$.error.code").value("ALREADY_STARTED"));
     }
 
     @Test

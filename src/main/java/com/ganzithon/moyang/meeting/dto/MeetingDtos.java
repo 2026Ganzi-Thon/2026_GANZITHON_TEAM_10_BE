@@ -27,8 +27,8 @@ public final class MeetingDtos {
     public record LeaveMeetingResponse(long meetingId, int participantCount, boolean refunded, int sheepRefunded,
                                        int sheepBalance) {}
 
-    /** 방장 취소 결과. refundedParticipants는 환불받은 참여자 수, hostRefunded는 방장 생성비 환불 여부. */
-    public record CancelMeetingResponse(long meetingId, String status, int refundedParticipants,
+    /** 방장 취소 결과. refundedParticipantCount는 환불받은 참여자 수, hostRefunded는 방장 생성비 환불 여부. */
+    public record CancelMeetingResponse(long meetingId, String status, int refundedParticipantCount,
                                         boolean hostRefunded, int sheepBalance) {}
 
     public record MeetingListResponse(Long recommendedMeetingId, List<MeetingSummary> meetings) {}

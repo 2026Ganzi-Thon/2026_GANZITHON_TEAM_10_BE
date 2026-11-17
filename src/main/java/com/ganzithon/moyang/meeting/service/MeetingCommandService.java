@@ -129,7 +129,7 @@ public class MeetingCommandService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
         MeetingParticipant mine = participants.findByMeetingIdAndUserId(meetingId, userId)
                 .filter(MeetingParticipant::isActive)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_PARTICIPANT));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_JOINED));
         if (meeting.getHostUserId() == userId) {
             throw new BusinessException(ErrorCode.HOST_CANNOT_LEAVE);
         }
@@ -155,25 +155,25 @@ public class MeetingCommandService {
         Meeting meeting = meetings.findForUpdate(meetingId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
         if (meeting.getHostUserId() != userId) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new BusinessException(ErrorCode.NOT_HOST);
         }
         LocalDateTime now = time.now();
         requireCancelable(meeting, now);
 
-        int refundedParticipants = 0;
+        int refundedParticipantCount = 0;
         List<MeetingParticipant> guests = participants.findByMeetingIdAndCanceledAtIsNull(meetingId).stream()
                 .filter(p -> p.getUserId() != userId)
                 .sorted(Comparator.comparingLong(MeetingParticipant::getUserId))
                 .toList();
         for (MeetingParticipant guest : guests) {
             if (sheep.refundMeeting(guest.getUserId(), meetingId).applied()) {
-                refundedParticipants++;
+                refundedParticipantCount++;
             }
         }
         boolean hostRefunded = hostRefundable(meeting, now) && sheep.refundMeeting(userId, meetingId).applied();
         meeting.cancel(CancelReason.HOST_CANCELED, now);
         meetings.saveAndFlush(meeting);
-        return new CancelMeetingResponse(meetingId, meeting.getStatus().name(), refundedParticipants, hostRefunded,
+        return new CancelMeetingResponse(meetingId, meeting.getStatus().name(), refundedParticipantCount, hostRefunded,
                 sheep.balance(userId).balance());
     }
 
@@ -181,7 +181,7 @@ public class MeetingCommandService {
     private static void requireCancelable(Meeting meeting, LocalDateTime now) {
         MeetingStatus status = meeting.statusAt(now);
         if (status != MeetingStatus.RECRUITING && status != MeetingStatus.OPEN) {
-            throw new BusinessException(ErrorCode.MEETING_NOT_CANCELABLE);
+            throw new BusinessException(ErrorCode.ALREADY_STARTED);
         }
     }
 

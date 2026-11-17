@@ -62,7 +62,7 @@ public class MeetingController {
             description = "시작 전(RECRUITING·OPEN) 모임에서 내 신청을 취소한다. 실시간은 시작 전이면 양털 1개 환불, 예약은 시작 10분 전"
                     + "(상세의 cancelRefundUntil)까지 환불하고 그 뒤에는 취소만 되고 환불은 없다. 취소한 모임에는 다시 신청할 수 없다. "
                     + "방장은 이 API 대신 모임 취소(DELETE /api/meetings/{id})를 쓴다. "
-                    + "오류: MEETING_NOT_FOUND(404), NOT_PARTICIPANT(403), HOST_CANNOT_LEAVE·MEETING_NOT_CANCELABLE(409).")
+                    + "오류: MEETING_NOT_FOUND(404), NOT_JOINED(403), HOST_CANNOT_LEAVE(403), ALREADY_STARTED(409).")
     @DeleteMapping("/{meetingId}/participants/me")
     public ApiResponse<LeaveMeetingResponse> leave(@PathVariable long meetingId) {
         return ApiResponse.ok(command.leave(currentUser.currentUserId(), meetingId));
@@ -71,7 +71,7 @@ public class MeetingController {
     @Operation(summary = "모임 취소 · 삭제 (방장)",
             description = "방장이 시작 전 모임을 취소한다. 참여 중인 사람은 모두 양털 1개를 환불받는다. 방장 생성비는 예약 모임을 시작 10분 전까지 "
                     + "취소할 때만 환불하고, 실시간 모임은 환불하지 않는다. 성공하면 status는 CANCELED, cancelReason은 HOST_CANCELED. "
-                    + "오류: MEETING_NOT_FOUND(404), FORBIDDEN(403, 방장이 아님), MEETING_NOT_CANCELABLE(409, 이미 시작·종료·취소).")
+                    + "오류: MEETING_NOT_FOUND(404), NOT_HOST(403, 방장이 아님), ALREADY_STARTED(409, 이미 시작·종료·취소).")
     @DeleteMapping("/{meetingId}")
     public ApiResponse<CancelMeetingResponse> cancel(@PathVariable long meetingId) {
         return ApiResponse.ok(command.cancelMeeting(currentUser.currentUserId(), meetingId));
