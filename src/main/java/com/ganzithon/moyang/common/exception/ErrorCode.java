@@ -10,6 +10,7 @@ public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요해요."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없어요."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "찾는 대상이 없어요."),
+    CONCURRENT_REQUEST(HttpStatus.CONFLICT, "이전 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요."), // 동시 요청(낙관적 락) 공통
 
     // drawing · ai (박준서)
     INVALID_IMAGE_FORMAT(HttpStatus.BAD_REQUEST, "jpg 또는 png 이미지만 올릴 수 있어요."),
@@ -28,7 +29,6 @@ public enum ErrorCode {
     NO_DRAWING_IN_MEETING(HttpStatus.NOT_FOUND, "모임에서 공유한 그림이 없어 카드가 없어요."),
     CONVERSATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 대화가 있는 그림이에요."),
     CONVERSATION_ALREADY_ENDED(HttpStatus.CONFLICT, "이미 끝난 대화예요."),
-    CONVERSATION_BUSY(HttpStatus.CONFLICT, "이전 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요."),
     NOT_ENOUGH_WOOL(HttpStatus.CONFLICT, "양털이 부족해요."),
     EXTEND_LIMIT_REACHED(HttpStatus.CONFLICT, "더 이야기할 수 있는 횟수를 모두 썼어요."),
     MEETING_NOT_ENDED(HttpStatus.CONFLICT, "아직 모임이 끝나지 않았어요."),

@@ -186,7 +186,7 @@ public class ConversationService {
             }
             if (fresh.getQuestionCount() != asked) {
                 // AI를 기다리는 사이 같은 대화의 다른 요청(연타 · 재시도)이 먼저 처리됨
-                throw new BusinessException(ErrorCode.CONVERSATION_BUSY);
+                throw new BusinessException(ErrorCode.CONCURRENT_REQUEST);
             }
             if (userMessage != null) {
                 messages.save(userMessage);
