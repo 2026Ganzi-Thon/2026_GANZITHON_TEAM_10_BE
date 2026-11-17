@@ -138,7 +138,7 @@ class ConversationFlowTest {
                 }
                 if (schemaName.equals("card")) {
                     lastCardPrompt = user;
-                    return "{\"whatISaid\":\"그림 이야기\",\"thoughts\":\"떠오른 생각\",\"todaysStory\":\"오늘의 마음\"}";
+                    return "{\"whatISaid\":\"그림 이야기\",\"thoughts\":\"떠오른 생각\",\"todaysStory\":\"오늘의 마음\",\"mainElements\":\"우산 쓴 사람\",\"spatialComposition\":\"가운데에 크게\",\"lineExpression\":\"\",\"emotionMeaning\":\"비를 막고 싶은 마음\"}";
                 }
                 return "{\"question\":\"어떤 마음이었나요?\",\"needsSupport\":" + aiSaysNeedsSupport
                         + ",\"aspect\":\"DRAWING\"}";
@@ -150,6 +150,8 @@ class ConversationFlowTest {
     WebApplicationContext context;
     @Autowired
     MeetingCardService meetingCards;
+    @Autowired
+    com.ganzithon.moyang.ai.service.ConversationService conversations;
     MockMvc mvc;
 
     @BeforeEach
@@ -167,7 +169,8 @@ class ConversationFlowTest {
 
     @Test
     void 모임_회고_카드는_본인_발언만으로_참여자별로_만든다() throws Exception {
-        uploadOk("창문이 하나뿐인 방");
+        long meetingRecordId = number(uploadOk("창문이 하나뿐인 방"), "$.data.recordId");
+        assertThat(conversations.recordView(meetingRecordId).orElseThrow().card()).isNull(); // 카드 전
         long drawingId = lastDrawingId;
         mvc.perform(get("/api/meetings/30/reflection")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("MEETING_NOT_FOUND"));
@@ -182,6 +185,9 @@ class ConversationFlowTest {
         meeting = new MeetingInfo(true, members);
         meetingCards.generateMeetingCards(30);
         meetingCards.generateMeetingCards(30); // 두 번 불려도 한 장
+        var meetingRecord = conversations.recordView(meetingRecordId).orElseThrow();
+        assertThat(meetingRecord.card().whatISaid()).isEqualTo("그림 이야기"); // 개인 대화가 없으면 모임 카드
+        assertThat(meetingRecord.messages()).isEmpty();
         assertThat(lastCardPrompt).contains("조용한 곳이 필요했어요").doesNotContain("죽고 싶다")
                 .doesNotContain("그림을 못 냈어요");
 
@@ -236,6 +242,8 @@ class ConversationFlowTest {
                 .andExpect(jsonPath("$.data.drawing.imageUrl").value("/api/drawings/" + drawingId + "/image"))
                 .andExpect(jsonPath("$.data.drawing.topicTitle").value("내가 서 있는 자리"))
                 .andExpect(jsonPath("$.data.card.whatISaid").value("그림 이야기"))
+                .andExpect(jsonPath("$.data.analysis.mainElements").value("우산 쓴 사람"))
+                .andExpect(jsonPath("$.data.analysis.lineExpression").isEmpty()) // 말하지 않은 칸은 null
                 .andExpect(jsonPath("$.data.fallback").value(false));
         assertThat(cardReadyRecords).contains(recordId);
 
@@ -243,6 +251,14 @@ class ConversationFlowTest {
                 .andExpect(jsonPath("$.data.status").value("ENDED"))
                 .andExpect(jsonPath("$.data.card.todaysStory").value("오늘의 마음"))
                 .andExpect(jsonPath("$.data.messages.length()").value(11));
+        // 기록 상세(record)용: 그림 · 카드 · 대화 내용을 recordId 하나로
+        var view = conversations.recordView(recordId).orElseThrow();
+        assertThat(view.drawing().drawingId()).isEqualTo(drawingId);
+        assertThat(view.card().whatISaid()).isEqualTo("그림 이야기");
+        assertThat(view.messages()).hasSize(11);
+        assertThat(view.analysis().mainElements()).isEqualTo("우산 쓴 사람");
+        assertThat(view.messages().get(0).role()).isEqualTo("AI");
+        assertThat(conversations.recordView(999999)).isEmpty();
         end(conversationId).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("CONVERSATION_ALREADY_ENDED"));
         answer(conversationId, "더 말하기").andExpect(status().isConflict());
@@ -374,7 +390,8 @@ class ConversationFlowTest {
         end(conversationId)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fallback").value(true))
-                .andExpect(jsonPath("$.data.card.whatISaid").value("우산을 쓴 사람을 그렸어요"));
+                .andExpect(jsonPath("$.data.card.whatISaid").value("우산을 쓴 사람을 그렸어요"))
+                .andExpect(jsonPath("$.data.analysis").isEmpty()); // AI 실패면 분석 없음
     }
 
     @Test
