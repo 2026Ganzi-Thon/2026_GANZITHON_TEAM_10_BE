@@ -148,7 +148,7 @@ class RecordFlowTest {
   });
  }
  @TestConfiguration static class Config {
-  @Bean RecordSnapshotReader reader(){return id->Optional.ofNullable(SOURCES.get(id));}
+  @Bean @Primary RecordSnapshotReader reader(){return id->Optional.ofNullable(SOURCES.get(id));}
   @Bean CurrentUserProvider currentUser(){return ()->{var attrs=(ServletRequestAttributes)RequestContextHolder.getRequestAttributes();String v=attrs==null?null:attrs.getRequest().getHeader("X-Test-User");if(v==null)throw new BusinessException(ErrorCode.UNAUTHORIZED);return Long.parseLong(v);};}
  }
 }

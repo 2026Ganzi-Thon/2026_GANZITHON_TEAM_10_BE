@@ -19,11 +19,11 @@ import com.ganzithon.moyang.common.exception.ErrorCode;
 class RecordMissingAuthTest {
     @LocalServerPort int port;
     @Autowired RecordService records;
-    @Test void absentRealSnapshotProviderFailsExplicitly() {
+    @Test void absentDrawingSourceFailsExplicitly() {
         long id=records.create(100);
         records.cardReady(id);
         assertThatThrownBy(()->records.complete(100,id,"제목")).isInstanceOfSatisfying(BusinessException.class,
-            e->assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECORD_SOURCE_UNAVAILABLE));
+            e->assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECORD_NOT_READY));
     }
     @Test void noUserProviderRejectsRecordsAccess() throws Exception {
         var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(

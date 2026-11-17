@@ -35,6 +35,6 @@ class RecordDayBoundaryTest {
  }
  @TestConfiguration static class Config {
   @Bean @Primary BoundaryClock boundaryClock(){return new BoundaryClock();}
-  @Bean RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,"url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.parse("2026-11-04T23:58:00+09:00")))));}
+  @Bean @Primary RecordSnapshotReader reader(){return id->Optional.of(new Snapshot(id,"url",null,new Analysis("a","b","c","d"),List.of(new Message(1,"USER","hello",OffsetDateTime.parse("2026-11-04T23:58:00+09:00")))));}
  }
 }
