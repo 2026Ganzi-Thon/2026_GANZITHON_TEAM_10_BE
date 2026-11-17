@@ -10,3 +10,6 @@ spring:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+moyang:
+  upload-dir: ${UPLOAD_DIR}   # 기본값 없음: 재배포 때 그림이 지워지지 않도록 jar 밖 경로를 꼭 지정
