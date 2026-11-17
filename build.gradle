@@ -23,6 +23,10 @@ dependencies {
     // Swagger UI (Boot 4.x 는 springdoc 3.x)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    testRuntimeOnly 'com.h2database:h2'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -44,4 +48,9 @@ jar {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Optional ASCII output path for Gradle test workers on Windows.
+if (providers.gradleProperty('buildDirOverride').isPresent()) {
+    layout.buildDirectory = file(providers.gradleProperty('buildDirOverride').get())
 }
