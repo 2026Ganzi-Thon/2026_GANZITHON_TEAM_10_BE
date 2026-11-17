@@ -30,6 +30,10 @@ public class User {
     @Column(nullable = false)
     private boolean onboardingCompleted;
 
+    /** 온보딩에서 고른 고민 묶음 코드(ThemeCode 이름). 온보딩 전에는 null. 온보딩 저장 API가 채운다. */
+    @Column(length = 30)
+    private String themeCode;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -48,6 +52,10 @@ public class User {
     public String getPasswordHash() { return passwordHash; }
     public String getNickname() { return nickname; }
     public boolean isOnboardingCompleted() { return onboardingCompleted; }
+
+    public String getThemeCode() { return themeCode; }
+
+    public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
 
     public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 }
