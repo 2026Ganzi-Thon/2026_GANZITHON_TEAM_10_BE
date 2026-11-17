@@ -39,6 +39,12 @@ public enum ErrorCode {
     // auth · user (백승효)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않아요."),
     INVALID_OPTION_CODE(HttpStatus.BAD_REQUEST, "없는 선택지 코드예요."),
+    INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "정원은 2명, 4명, 6명 중에서 골라 주세요."),
+    START_AT_REQUIRED(HttpStatus.BAD_REQUEST, "미리 약속한 모양은 시작 시각이 필요해요."),
+    INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "모임 닉네임은 2자 이상 15자 이하로 써 주세요."),
+    MEETING_FULL(HttpStatus.CONFLICT, "정원이 다 찬 모임이에요."),
+    ALREADY_JOINED(HttpStatus.CONFLICT, "이미 신청한 모임이에요."),
+    MEETING_NOT_JOINABLE(HttpStatus.CONFLICT, "이미 시작했거나 끝난, 신청할 수 없는 모임이에요."),
     ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
