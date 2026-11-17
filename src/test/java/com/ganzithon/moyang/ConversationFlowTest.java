@@ -340,7 +340,8 @@ class ConversationFlowTest {
         aiSaysNeedsSupport = false;
 
         end(conversationId).andExpect(status().isOk());
-        assertThat(lastCardPrompt).contains("창밖을 보는 사람").doesNotContain("죽고 싶다").doesNotContain("그만하고 싶어요");
+        assertThat(lastCardPrompt).contains("창밖을 보는 사람").doesNotContain("죽고 싶다").doesNotContain("그만하고 싶어요")
+                .doesNotContain("어떤 마음이었나요?"); // AI 질문은 카드 재료에 넣지 않는다
         assertThat(woolBalance).isEqualTo(3);
     }
 
