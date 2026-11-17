@@ -8,10 +8,7 @@ import com.ganzithon.moyang.common.port.Ports.TopicInfo;
 import com.ganzithon.moyang.common.port.Ports.TopicReader;
 import com.ganzithon.moyang.common.port.Ports.UserContext;
 import com.ganzithon.moyang.common.port.Ports.UserContextProvider;
-import com.ganzithon.moyang.common.port.Ports.WoolPort;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -48,20 +45,6 @@ public class LocalStubs {
     @Bean
     TopicReader topicReader() {
         return topicId -> Optional.of(new TopicInfo(topicId, "내가 서 있는 자리", "지금 내가 서 있는 곳을 그려 보세요."));
-    }
-
-    @Bean
-    WoolPort woolPort() {
-        Set<String> spent = ConcurrentHashMap.newKeySet();
-        return new WoolPort() {
-            public int balance(long userId) {
-                return 3;
-            }
-
-            public void spend(long userId, String referenceId) {
-                spent.add(referenceId);
-            }
-        };
     }
 
     @Bean

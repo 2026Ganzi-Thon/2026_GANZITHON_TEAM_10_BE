@@ -33,6 +33,9 @@ public enum ErrorCode {
     EXTEND_LIMIT_REACHED(HttpStatus.CONFLICT, "더 이야기할 수 있는 횟수를 모두 썼어요."),
     MEETING_NOT_ENDED(HttpStatus.CONFLICT, "아직 모임이 끝나지 않았어요."),
 
+    REFUND_NOT_ELIGIBLE(HttpStatus.CONFLICT, "환불할 양털 사용 내역이 없어요."),
+    SHEEP_BALANCE_LIMIT(HttpStatus.CONFLICT, "양털 잔액 한도를 초과했어요."),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;

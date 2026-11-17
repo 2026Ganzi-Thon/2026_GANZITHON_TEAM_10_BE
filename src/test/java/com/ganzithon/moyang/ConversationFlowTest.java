@@ -100,6 +100,7 @@ class ConversationFlowTest {
         }
 
         @Bean
+        @Primary
         WoolPort woolPort() {
             return new WoolPort() {
                 public int balance(long id) {
