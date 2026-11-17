@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
  * DEMO_PASSWORD가 비어 있으면 아무것도 만들지 않는다 (코드에 기본 비밀번호를 두지 않기 위해).
  */
 @Component
+@Order(1) // 양털 시더(@Order(2))보다 먼저: 계정이 있어야 지갑을 채울 수 있다
 @EnableConfigurationProperties(DemoAccountProperties.class)
 public class DemoAccountSeeder implements ApplicationRunner {
 
