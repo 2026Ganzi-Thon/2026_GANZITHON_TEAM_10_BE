@@ -43,20 +43,28 @@ public final class ConversationDtos {
 
     public record CardView(String whatISaid, String thoughts, String todaysStory) {}
 
+    /** 그림 자세히 살펴보기: 주요 요소 · 공간과 배치 · 선과 표현 방식 · 감정과 의미. 사용자가 말하지 않은 칸은 null. */
+    public record AnalysisView(String mainElements, String spatialComposition, String lineExpression,
+                               String emotionMeaning) {}
+
     public record EndResponse(long conversationId, long recordId, String status, DrawingView drawing, CardView card,
-                              boolean fallback) {}
+                              AnalysisView analysis, boolean fallback) {}
 
     public record MessageView(long messageId, String role, String type, String content, int order,
                               OffsetDateTime createdAt) {}
 
     public record DetailResponse(long conversationId, long drawingId, long recordId, String status,
                                  List<MessageView> messages, int remainingFreeQuestions, boolean canExtend,
-                                 DrawingView drawing, CardView card, boolean fallback) {}
+                                 DrawingView drawing, CardView card, AnalysisView analysis, boolean fallback) {}
 
     public record InProgressItem(long conversationId, long drawingId, long recordId, String imageUrl,
                                  String topicTitle, int remainingFreeQuestions, OffsetDateTime startedAt) {}
 
     public record InProgressResponse(InProgressItem conversation) {}
+
+    /** 기록 상세(record)용. card가 null이면 아직 회고 카드가 없음. messages는 대화 내역 조회와 같은 형식. */
+    public record RecordView(long recordId, DrawingView drawing, CardView card, AnalysisView analysis, boolean fallback,
+                             List<MessageView> messages) {}
 
     public record MeetingCardResponse(long meetingId, long recordId, DrawingView drawing, CardView card,
                                       boolean fallback) {}

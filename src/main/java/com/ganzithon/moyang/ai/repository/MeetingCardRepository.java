@@ -9,4 +9,6 @@ public interface MeetingCardRepository extends JpaRepository<MeetingCard, Long> 
     Optional<MeetingCard> findByMeetingIdAndUserId(Long meetingId, Long userId);
 
     boolean existsByMeetingIdAndUserId(Long meetingId, Long userId);
+
+    Optional<MeetingCard> findFirstByRecordIdOrderByIdDesc(Long recordId);
 }

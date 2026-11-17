@@ -59,6 +59,19 @@ public class Conversation {
     @Column(nullable = false)
     private boolean cardFallback;
 
+    /** 그림 자세히 살펴보기 4칸 (AI가 대화 마치기 때 카드와 함께 만듦). */
+    @Column(columnDefinition = "TEXT")
+    private String mainElements;
+
+    @Column(columnDefinition = "TEXT")
+    private String spatialComposition;
+
+    @Column(columnDefinition = "TEXT")
+    private String lineExpression;
+
+    @Column(columnDefinition = "TEXT")
+    private String emotionMeaning;
+
     private Instant endedAt;
 
     @Column(nullable = false)
@@ -86,6 +99,14 @@ public class Conversation {
         updatedAt = Instant.now();
     }
 
+    public void analyzed(String mainElements, String spatialComposition, String lineExpression,
+                         String emotionMeaning) {
+        this.mainElements = mainElements;
+        this.spatialComposition = spatialComposition;
+        this.lineExpression = lineExpression;
+        this.emotionMeaning = emotionMeaning;
+    }
+
     public void end(String whatISaid, String thoughts, String todaysStory, boolean fallback) {
         status = Status.ENDED;
         cardWhatISaid = whatISaid;
@@ -111,5 +132,9 @@ public class Conversation {
     public String getCardThoughts() { return cardThoughts; }
     public String getCardTodaysStory() { return cardTodaysStory; }
     public boolean isCardFallback() { return cardFallback; }
+    public String getMainElements() { return mainElements; }
+    public String getSpatialComposition() { return spatialComposition; }
+    public String getLineExpression() { return lineExpression; }
+    public String getEmotionMeaning() { return emotionMeaning; }
     public Instant getCreatedAt() { return createdAt; }
 }
