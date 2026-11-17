@@ -82,11 +82,11 @@ reference_id는 utf8mb4_bin을 사용합니다. 대소문자가 다른 문자열
 
 ```powershell
 $env:JAVA_HOME='C:/path/to/jdk-17'
-.\gradlew.bat test bootJar
-# 한글 경로의 Gradle 테스트 클래스 로딩 오류를 피하려면:
+.\gradlew.bat build
+# 또는 동일한 표준 빌드를 실행하는 스크립트:
 .\scripts\verify-sheep.ps1
 ```
 
-로컬 서버는 기본 README의 application-local.yml + MySQL 설정을 따릅니다. 이 브랜치만 실행하면 실제 CurrentUserProvider가 없어 양털 API는 401입니다. 임의 로그인 우회 코드를 추가하지 않습니다. 정상 HTTP 동작은 테스트 전용 인증 제공자를 넣은 실제 서버 테스트로 검증합니다.
+로컬 서버는 기본 README의 application-local.yml + MySQL 설정을 따릅니다. dev의 local 프로필에서는 LocalStubs의 기존 X-User-Id 인증 모의 구현을 사용합니다. local 이외에는 실제 인증 구현이 없으면 401입니다. LocalStubs의 가짜 양털 빈은 제거했으므로 모든 프로필에서 WoolPortAdapter가 실제 지갑을 사용합니다. 정상 HTTP 동작은 테스트 전용 인증 제공자를 넣은 실제 서버 테스트로 검증합니다.
 
 검증 범위: HTTP 인증/소유권/필드/검증, 실제 WoolPort 선택, 최초 잔액, 일일/시연 보상, 0 결정의 다음 날 재시도, 문자열 키, 병렬 생성/차감/환불, 실패 롤백, 오래된 지갑 캐시, SQL/JPA 매핑.

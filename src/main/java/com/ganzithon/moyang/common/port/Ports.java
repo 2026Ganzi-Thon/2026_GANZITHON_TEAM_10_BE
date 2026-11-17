@@ -64,4 +64,3 @@ public final class Ports {
         Optional<MeetingInfo> find(long meetingId);
     }
 }
-
