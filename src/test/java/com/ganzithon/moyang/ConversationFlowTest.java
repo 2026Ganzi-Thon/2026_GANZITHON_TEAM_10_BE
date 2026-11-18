@@ -72,6 +72,7 @@ class ConversationFlowTest {
     @TestConfiguration
     static class Fakes {
         @Bean
+        @Primary
         CurrentUserProvider currentUserProvider() {
             return () -> userId;
         }

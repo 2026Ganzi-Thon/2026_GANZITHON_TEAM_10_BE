@@ -36,6 +36,9 @@ public enum ErrorCode {
     REFUND_NOT_ELIGIBLE(HttpStatus.CONFLICT, "환불할 양털 사용 내역이 없어요."),
     SHEEP_BALANCE_LIMIT(HttpStatus.CONFLICT, "양털 잔액 한도를 초과했어요."),
 
+    // auth · user (백승효)
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않아요."),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;

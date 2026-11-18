@@ -23,3 +23,8 @@ moyang:
     base-url: https://api.upstage.ai/v1
     model: solar-pro4
     timeout-seconds: 30
+  jwt:
+    secret: ${JWT_SECRET:}                 # 토큰 서명 키(32자 이상). 환경변수로만 받는다. 운영은 없으면 기동 실패
+  demo:
+    password: ${DEMO_PASSWORD:}            # 데모 계정 공통 비밀번호. 환경변수로만 받는다(비면 계정을 만들지 않음)
+    count: ${DEMO_ACCOUNT_COUNT:6}         # demo1 ~ demoN

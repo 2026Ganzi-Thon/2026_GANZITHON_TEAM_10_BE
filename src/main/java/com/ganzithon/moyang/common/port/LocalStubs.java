@@ -1,8 +1,5 @@
 package com.ganzithon.moyang.common.port;
 
-import com.ganzithon.moyang.common.exception.BusinessException;
-import com.ganzithon.moyang.common.exception.ErrorCode;
-import com.ganzithon.moyang.common.port.Ports.CurrentUserProvider;
 import com.ganzithon.moyang.common.port.Ports.MeetingSharePort;
 import com.ganzithon.moyang.common.port.Ports.TopicInfo;
 import com.ganzithon.moyang.common.port.Ports.TopicReader;
@@ -12,30 +9,15 @@ import java.util.Optional;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * 로컬 개발용 가짜 구현. local 프로필에서만 켜진다 (--spring.profiles.active=local).
- * 진짜 구현(Auth=백승효, Sheep=박준석, Topic·Meeting=백승효)이 dev에 올라오면 해당 빈을 여기서 지운다.
- * X-User-Id 헤더를 그대로 믿으므로 배포 환경에서는 절대 켜면 안 된다. 그 외 프로필은 PortFallbacks(전부 막힘)를 쓴다.
+ * 진짜 구현(Auth=백승효 완료, Topic·Meeting=백승효, Record=박준석)이 dev에 올라오면 해당 빈을 여기서 지운다.
+ * 로그인(CurrentUserProvider)은 진짜 JWT 구현(JwtCurrentUserProvider)을 쓰므로 여기엔 없다. 그 외 프로필은 PortFallbacks(전부 막힘)를 쓴다.
  */
 @Configuration
 @Profile("local")
 public class LocalStubs {
-
-    @Bean
-    CurrentUserProvider currentUserProvider() {
-        return () -> {
-            var attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            String header = attrs == null ? null : attrs.getRequest().getHeader("X-User-Id");
-            try {
-                return Long.parseLong(header);
-            } catch (NumberFormatException e) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED);
-            }
-        };
-    }
 
     @Bean
     UserContextProvider userContextProvider() {

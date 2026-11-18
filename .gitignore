@@ -22,3 +22,7 @@ application-local.yml
 
 # 업로드된 그림 파일
 uploads/
+
+# Claude Code 개인 설정 (커밋 금지)
+CLAUDE.local.md
+.claude/settings.local.json
