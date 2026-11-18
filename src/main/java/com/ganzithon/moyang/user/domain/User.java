@@ -34,6 +34,10 @@ public class User {
     @Column(length = 30)
     private String themeCode;
 
+    /** 양 프로필 색상 코드(예: PINK). 고르기 전에는 null. 바꾸는 API는 양 색상 단위에서 만든다. */
+    @Column(length = 20)
+    private String sheepColor;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,6 +58,7 @@ public class User {
     public boolean isOnboardingCompleted() { return onboardingCompleted; }
 
     public String getThemeCode() { return themeCode; }
+    public String getSheepColor() { return sheepColor; }
 
     public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
 

@@ -4,8 +4,11 @@ import com.ganzithon.moyang.common.port.Ports.CurrentUserProvider;
 import com.ganzithon.moyang.common.response.ApiResponse;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingRequest;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingResponse;
+import com.ganzithon.moyang.user.dto.UserDtos.MeResponse;
 import com.ganzithon.moyang.user.service.OnboardingService;
+import com.ganzithon.moyang.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,12 +18,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/users/me")
 public class UserController {
 
+    private final UserService userService;
     private final OnboardingService onboarding;
     private final CurrentUserProvider currentUser;
 
-    public UserController(OnboardingService onboarding, CurrentUserProvider currentUser) {
+    public UserController(UserService userService, OnboardingService onboarding, CurrentUserProvider currentUser) {
+        this.userService = userService;
         this.onboarding = onboarding;
         this.currentUser = currentUser;
+    }
+
+    @Operation(summary = "내 정보 조회",
+            description = "닉네임 · 온보딩 완료 여부 · 양 색상 · 온보딩 답을 돌려줍니다. 온보딩 전이면 onboarding이 null이고, "
+                    + "건너뛴 항목과 고르기 전인 sheepColor도 null입니다. 토큰의 사용자가 없으면 404 USER_NOT_FOUND입니다.")
+    @GetMapping
+    public ApiResponse<MeResponse> me() {
+        return ApiResponse.ok(userService.me(currentUser.currentUserId()));
     }
 
     @Operation(summary = "온보딩 답 저장",
