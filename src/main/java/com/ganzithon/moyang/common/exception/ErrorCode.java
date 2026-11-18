@@ -36,6 +36,10 @@ public enum ErrorCode {
     REFUND_NOT_ELIGIBLE(HttpStatus.CONFLICT, "환불할 양털 사용 내역이 없어요."),
     SHEEP_BALANCE_LIMIT(HttpStatus.CONFLICT, "양털 잔액 한도를 초과했어요."),
 
+    // auth · user (백승효)
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않아요."),
+
+    // record
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요."),
     RECORD_NOT_READY(HttpStatus.CONFLICT, "회고 저장에 필요한 데이터가 아직 준비되지 않았어요."),
     RECORD_SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "그림·AI 기록 연동이 아직 준비되지 않았어요."),
