@@ -20,6 +20,11 @@ public final class MeetingEnums {
         INTRO, DRAWING, SHARING, CLOSING
     }
 
+    /** 채팅 메시지 종류. TEXT 일반 채팅, DRAWING 그림 공유, SYSTEM 서버가 남기는 안내(참여자는 보낼 수 없다). */
+    public enum MessageType {
+        TEXT, DRAWING, SYSTEM
+    }
+
     public enum CancelReason {
         HOST_CANCELED, NOT_ENOUGH_PARTICIPANTS
     }

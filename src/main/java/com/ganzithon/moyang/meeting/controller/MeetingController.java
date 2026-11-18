@@ -3,6 +3,9 @@ package com.ganzithon.moyang.meeting.controller;
 import com.ganzithon.moyang.common.port.Ports.CurrentUserProvider;
 import com.ganzithon.moyang.common.response.ApiResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CancelMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.ChatPollResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.SendMessageRequest;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.SendMessageResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.LeaveMeetingResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CreateMeetingRequest;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CreateMeetingResponse;
@@ -13,6 +16,7 @@ import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingListResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MyMeetingsResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.EnterMeetingResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.StartMeetingResponse;
+import com.ganzithon.moyang.meeting.service.MeetingChatService;
 import com.ganzithon.moyang.meeting.service.MeetingCommandService;
 import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
@@ -33,14 +37,44 @@ public class MeetingController {
     private final MeetingQueryService query;
     private final MeetingCommandService command;
     private final MeetingLifecycleService lifecycle;
+    private final MeetingChatService chat;
     private final CurrentUserProvider currentUser;
 
     public MeetingController(MeetingQueryService query, MeetingCommandService command,
-                             MeetingLifecycleService lifecycle, CurrentUserProvider currentUser) {
+                             MeetingLifecycleService lifecycle, MeetingChatService chat,
+                             CurrentUserProvider currentUser) {
         this.query = query;
         this.command = command;
         this.lifecycle = lifecycle;
+        this.chat = chat;
         this.currentUser = currentUser;
+    }
+
+    @Operation(summary = "모임 채팅 보내기 · 그림 공유",
+            description = "type=TEXT는 content 필수(500자 이하), type=DRAWING은 내가 올린 drawingId 필수이고 content는 그림 설명(선택). "
+                    + "그림은 먼저 POST /api/drawings로 올리고 받은 drawingId만 보낸다. 진행 중(IN_PROGRESS)인 모임의 참여자만 보낼 수 있고 "
+                    + "모임 채팅에서는 위기 감지를 하지 않는다. "
+                    + "오류: INVALID_MESSAGE_TYPE · EMPTY_CONTENT · CONTENT_TOO_LONG · INVALID_REQUEST(400), "
+                    + "MEETING_NOT_FOUND(404, 없거나 종료 24시간 뒤 삭제), NOT_PARTICIPANT(403), "
+                    + "MEETING_NOT_IN_PROGRESS(409), FORBIDDEN(403, 내 그림이 아님), DRAWING_NOT_FOUND(404).")
+    @PostMapping("/{meetingId}/messages")
+    public ApiResponse<SendMessageResponse> sendMessage(@PathVariable long meetingId,
+                                                        @RequestBody SendMessageRequest request) {
+        return ApiResponse.ok(chat.send(currentUser.currentUserId(), meetingId, request));
+    }
+
+    @Operation(summary = "모임 채팅 조회 (3초 폴링)",
+            description = "afterId보다 뒤의 메시지만(처음에는 생략하면 전체). 응답에 모임 진행 정보도 같이 온다: "
+                    + "status(RECRUITING·OPEN·IN_PROGRESS·ENDED·CANCELED), phase(INTRO·DRAWING·SHARING·CLOSING, 시작 전 null), "
+                    + "currentStep(1~4), topic, submittedDrawingCount/participantCount, endAgreedCount, endAt, deleteAt(종료 24시간 뒤). "
+                    + "프론트는 폴링으로 status가 IN_PROGRESS·CANCELED·ENDED로 바뀐 것을 알아채 화면을 옮긴다(대기실에서도 호출 가능). "
+                    + "type: TEXT 일반 채팅 · DRAWING 그림 공유(imageUrl은 인증 토큰이 필요한 상대경로) · SYSTEM 안내(sender 없음). "
+                    + "응답에 userId는 없고 모임 닉네임(senderNickname)만 있다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_PARTICIPANT(403).")
+    @GetMapping("/{meetingId}/messages")
+    public ApiResponse<ChatPollResponse> messages(@PathVariable long meetingId,
+                                                  @RequestParam(required = false) Long afterId) {
+        return ApiResponse.ok(chat.poll(currentUser.currentUserId(), meetingId, afterId));
     }
 
     @Operation(summary = "모임 만들기",

@@ -49,6 +49,20 @@ public final class MeetingDtos {
                                         OffsetDateTime enterOpenAt, OffsetDateTime cancelRefundUntil,
                                         String cancelReason, String phase) {}
 
+    /** 채팅 보내기 요청. type은 TEXT 또는 DRAWING. DRAWING은 drawingId가 필수이고 content는 그림 설명(선택). */
+    public record SendMessageRequest(String type, String content, Long drawingId) {}
+
+    public record SendMessageResponse(long messageId, OffsetDateTime createdAt) {}
+
+    /** 채팅 한 줄. SYSTEM은 senderNickname이 null이고, DRAWING만 imageUrl이 있다. 응답에는 userId를 넣지 않는다. */
+    public record ChatMessageItem(long messageId, String type, String senderNickname,
+                                  String content, String imageUrl, boolean mine, OffsetDateTime createdAt) {}
+
+    /** 채팅 폴링 응답: 모임 진행 정보와 새 메시지. 시작 전에는 phase · currentStep이 null. */
+    public record ChatPollResponse(String status, String phase, Integer currentStep, String topic,
+                                   int submittedDrawingCount, int participantCount, int endAgreedCount,
+                                   OffsetDateTime endAt, OffsetDateTime deleteAt, List<ChatMessageItem> messages) {}
+
     /** 실시간 모임 시작 결과. 시작하면 status=IN_PROGRESS, phase=INTRO. */
     public record StartMeetingResponse(long meetingId, String status, String phase, int participantCount) {}
 
