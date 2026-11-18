@@ -110,7 +110,7 @@ public class MeetingChatService {
         LocalDateTime now = time.now();
         Meeting meeting = meetings.findById(meetingId).filter(m -> !m.expired(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
-        requireActiveParticipant(meetingId, userId);
+        MeetingParticipant me = requireActiveParticipant(meetingId, userId);
 
         List<MeetingMessage> rows = afterId == null
                 ? messages.findByMeetingIdOrderByIdAsc(meetingId)
@@ -131,7 +131,7 @@ public class MeetingChatService {
                 meeting.getPhase() == null ? null : meeting.getPhase().ordinal() + 1,
                 topicVisible ? meeting.getTopicTitle() : null,
                 (int) messages.countDrawingSubmitters(meetingId), active.size(),
-                0, // 종료 동의 수: 대화 종료 동의 단위에서 채운다
+                (int) active.stream().filter(MeetingParticipant::hasAgreedEnd).count(), me.hasAgreedEnd(),
                 scheduled ? MeetingQueryService.toOffset(meeting.getStartAt().plus(Meeting.SCHEDULED_LENGTH)) : null,
                 status == MeetingStatus.ENDED && meeting.getEndedAt() != null
                         ? MeetingQueryService.toOffset(meeting.getEndedAt().plus(Meeting.ENDED_VISIBLE)) : null,
@@ -149,8 +149,8 @@ public class MeetingChatService {
                 MeetingQueryService.toOffset(r.getCreatedAt()));
     }
 
-    private void requireActiveParticipant(long meetingId, long userId) {
-        participants.findByMeetingIdAndUserId(meetingId, userId).filter(MeetingParticipant::isActive)
+    private MeetingParticipant requireActiveParticipant(long meetingId, long userId) {
+        return participants.findByMeetingIdAndUserId(meetingId, userId).filter(MeetingParticipant::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_PARTICIPANT));
     }
 

@@ -39,6 +39,9 @@ public class MeetingParticipant {
     /** 예약 모임에 실제로 입장한 시각. null이면 아직 입장하지 않았다(시작 판단에 쓴다). */
     private LocalDateTime enteredAt;
 
+    /** '대화 종료'에 동의한 시각. null이면 아직 동의하지 않았다. 참여자 전원이 동의하면 모임이 종료된다. */
+    private LocalDateTime endAgreedAt;
+
     protected MeetingParticipant() {}
 
     public MeetingParticipant(long meetingId, long userId, String meetingNickname, LocalDateTime joinedAt) {
@@ -60,6 +63,17 @@ public class MeetingParticipant {
     public boolean isActive() { return canceledAt == null; }
 
     public boolean hasEntered() { return enteredAt != null; }
+
+    public LocalDateTime getEndAgreedAt() { return endAgreedAt; }
+
+    public boolean hasAgreedEnd() { return endAgreedAt != null; }
+
+    /** 종료 동의. 이미 동의했으면 처음 시각을 유지한다(여러 번 눌러도 1번). */
+    public void agreeEnd(LocalDateTime now) {
+        if (endAgreedAt == null) {
+            this.endAgreedAt = now;
+        }
+    }
 
     /** 입장 기록. 이미 입장했으면 처음 시각을 유지한다(재입장해도 순서가 바뀌지 않게). */
     public void enter(LocalDateTime now) {

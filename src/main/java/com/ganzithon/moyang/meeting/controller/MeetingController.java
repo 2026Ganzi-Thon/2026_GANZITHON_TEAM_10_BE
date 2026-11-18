@@ -15,10 +15,12 @@ import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingDetailResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingListResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MyMeetingsResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.EnterMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.EndMeetingResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.PhaseNextResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.StartMeetingResponse;
 import com.ganzithon.moyang.meeting.service.MeetingChatService;
 import com.ganzithon.moyang.meeting.service.MeetingCommandService;
+import com.ganzithon.moyang.meeting.service.MeetingEndService;
 import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
 import com.ganzithon.moyang.meeting.service.MeetingPhaseService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
@@ -41,17 +43,33 @@ public class MeetingController {
     private final MeetingLifecycleService lifecycle;
     private final MeetingChatService chat;
     private final MeetingPhaseService phases;
+    private final MeetingEndService ending;
     private final CurrentUserProvider currentUser;
 
     public MeetingController(MeetingQueryService query, MeetingCommandService command,
                              MeetingLifecycleService lifecycle, MeetingChatService chat,
-                             MeetingPhaseService phases, CurrentUserProvider currentUser) {
+                             MeetingPhaseService phases, MeetingEndService ending,
+                             CurrentUserProvider currentUser) {
         this.query = query;
         this.command = command;
         this.lifecycle = lifecycle;
         this.chat = chat;
         this.phases = phases;
+        this.ending = ending;
         this.currentUser = currentUser;
+    }
+
+    @Operation(summary = "대화 종료 동의",
+            description = "'대화 종료' 버튼. 진행 중(IN_PROGRESS)인 모임에서 참여자 전원이 누르면 모임이 종료(status=ENDED)된다. "
+                    + "같은 사람이 여러 번 눌러도 1번으로 세고, 눌렀다가 취소하거나 강제로 종료하는 기능은 없다. "
+                    + "전원이 동의하는 순간 채팅에 안내(SYSTEM)가 남고, 종료가 확정된 뒤 참여자별 회고 카드가 서버에서 따로 만들어진다"
+                    + "(AI 호출이라 몇 초~수십 초 걸릴 수 있고, 실패해도 종료는 유지된다). 카드는 "
+                    + "GET /api/meetings/{id}/reflection으로 가져오고, 만드는 동안에는 404 NO_DRAWING_IN_MEETING이 오니 몇 초 간격으로 다시 부른다. "
+                    + "이미 종료된 모임에서 동의한 사람이 다시 눌러도 오류 없이 현재 상태를 돌려준다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_JOINED(403, 참여자가 아님), MEETING_NOT_IN_PROGRESS(409).")
+    @PostMapping("/{meetingId}/end")
+    public ApiResponse<EndMeetingResponse> end(@PathVariable long meetingId) {
+        return ApiResponse.ok(ending.end(currentUser.currentUserId(), meetingId));
     }
 
     @Operation(summary = "주제 건너뛰기 (다음 단계로)",
@@ -82,7 +100,7 @@ public class MeetingController {
     @Operation(summary = "모임 채팅 조회 (3초 폴링)",
             description = "afterId보다 뒤의 메시지만(처음에는 생략하면 전체). 응답에 모임 진행 정보도 같이 온다: "
                     + "status(RECRUITING·OPEN·IN_PROGRESS·ENDED·CANCELED), phase(INTRO·DRAWING·SHARING·CLOSING, 시작 전 null), "
-                    + "currentStep(1~4), topic, submittedDrawingCount/participantCount, endAgreedCount, endAt, deleteAt(종료 24시간 뒤). "
+                    + "currentStep(1~4), topic, submittedDrawingCount/participantCount, endAgreedCount(종료 동의한 사람 수)/endAgreed(내가 동의했는지), endAt, deleteAt(종료 24시간 뒤). "
                     + "프론트는 폴링으로 status가 IN_PROGRESS·CANCELED·ENDED로 바뀐 것을 알아채 화면을 옮긴다(대기실에서도 호출 가능). "
                     + "type: TEXT 일반 채팅 · DRAWING 그림 공유(imageUrl은 인증 토큰이 필요한 상대경로) · SYSTEM 안내(sender 없음). "
                     + "응답에 userId는 없고 모임 닉네임(senderNickname)만 있다. "

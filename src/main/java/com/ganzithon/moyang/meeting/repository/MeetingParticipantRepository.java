@@ -30,6 +30,9 @@ public interface MeetingParticipantRepository extends JpaRepository<MeetingParti
 
     long countByMeetingIdAndCanceledAtIsNullAndEnteredAtIsNotNull(long meetingId);
 
+    /** 참여 중이면서 대화 종료에 동의한 사람 수. */
+    long countByMeetingIdAndCanceledAtIsNullAndEndAgreedAtIsNotNull(long meetingId);
+
     List<MeetingParticipant> findByUserIdAndCanceledAtIsNull(long userId);
 
     List<MeetingParticipant> findByMeetingIdInAndUserIdAndCanceledAtIsNull(Collection<Long> meetingIds, long userId);

@@ -61,7 +61,10 @@ public final class MeetingDtos {
     /** 채팅 폴링 응답: 모임 진행 정보와 새 메시지. 시작 전에는 phase · currentStep이 null. */
     public record ChatPollResponse(String status, String phase, Integer currentStep, String topic,
                                    int submittedDrawingCount, int participantCount, int endAgreedCount,
-                                   OffsetDateTime endAt, OffsetDateTime deleteAt, List<ChatMessageItem> messages) {}
+                                   boolean endAgreed, OffsetDateTime endAt, OffsetDateTime deleteAt, List<ChatMessageItem> messages) {}
+
+    /** 대화 종료 동의 결과. 전원이 동의하면 status=ENDED. */
+    public record EndMeetingResponse(long meetingId, int endAgreedCount, int participantCount, String status) {}
 
     /** 다음 단계로 넘긴 결과. topic은 모임 주제. */
     public record PhaseNextResponse(long meetingId, String phase, String topic) {}

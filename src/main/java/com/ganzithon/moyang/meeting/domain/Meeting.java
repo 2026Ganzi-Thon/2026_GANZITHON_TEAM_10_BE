@@ -153,6 +153,11 @@ public class Meeting {
         return true;
     }
 
+    /** 모임을 종료한다(참여자 전원이 대화 종료에 동의했을 때). */
+    public void end(LocalDateTime now) {
+        changeStatus(MeetingStatus.ENDED, now);
+    }
+
     public void cancel(CancelReason reason, LocalDateTime now) {
         this.cancelReason = reason;
         changeStatus(MeetingStatus.CANCELED, now);
