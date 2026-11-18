@@ -1,8 +1,6 @@
 package com.ganzithon.moyang.common.port;
 
 import com.ganzithon.moyang.common.port.Ports.MeetingSharePort;
-import com.ganzithon.moyang.common.port.Ports.TopicInfo;
-import com.ganzithon.moyang.common.port.Ports.TopicReader;
 import com.ganzithon.moyang.common.port.Ports.UserContext;
 import com.ganzithon.moyang.common.port.Ports.UserContextProvider;
 import java.util.Optional;
@@ -12,7 +10,7 @@ import org.springframework.context.annotation.Profile;
 
 /**
  * 로컬 개발용 가짜 구현. local 프로필에서만 켜진다 (--spring.profiles.active=local).
- * 진짜 구현(Auth=백승효 완료, Topic·Meeting=백승효, Record=박준석)이 dev에 올라오면 해당 빈을 여기서 지운다.
+ * 진짜 구현(Auth·Topic=백승효 완료, Meeting=백승효, Record=박준석)이 dev에 올라오면 해당 빈을 여기서 지운다.
  * 로그인(CurrentUserProvider)은 진짜 JWT 구현(JwtCurrentUserProvider)을 쓰므로 여기엔 없다. 그 외 프로필은 PortFallbacks(전부 막힘)를 쓴다.
  */
 @Configuration
@@ -22,11 +20,6 @@ public class LocalStubs {
     @Bean
     UserContextProvider userContextProvider() {
         return userId -> UserContext.EMPTY;
-    }
-
-    @Bean
-    TopicReader topicReader() {
-        return topicId -> Optional.of(new TopicInfo(topicId, "내가 서 있는 자리", "지금 내가 서 있는 곳을 그려 보세요."));
     }
 
     @Bean

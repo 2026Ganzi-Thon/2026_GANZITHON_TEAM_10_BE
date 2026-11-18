@@ -38,6 +38,8 @@ public enum ErrorCode {
 
     // auth · user (백승효)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않아요."),
+    INVALID_OPTION_CODE(HttpStatus.BAD_REQUEST, "없는 선택지 코드예요."),
+    ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
 
     // record
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요."),

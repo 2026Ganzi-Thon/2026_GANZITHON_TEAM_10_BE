@@ -97,6 +97,7 @@ class ConversationFlowTest {
         }
 
         @Bean
+        @Primary
         TopicReader topicReader() {
             return id -> id == 3 ? Optional.of(new TopicInfo(3, "내가 서 있는 자리", "설명")) : Optional.empty();
         }
