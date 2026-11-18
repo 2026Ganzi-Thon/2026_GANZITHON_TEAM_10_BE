@@ -9,6 +9,12 @@ public final class UserDtos {
     public record MeResponse(long userId, String nickname, boolean onboardingCompleted,
                              String sheepColor, OnboardingData onboarding) {}
 
+    /** 닉네임 수정 요청. 앞뒤 공백을 지운 뒤 2~15자인지 서버가 검사한다. */
+    public record NicknameRequest(String nickname) {}
+
+    /** 저장된(공백을 지운) 닉네임. */
+    public record NicknameResponse(long userId, String nickname) {}
+
     /** 양 색상 수정 요청. 코드값은 프론트가 정하고, 서버는 형식만 검사한다. */
     public record SheepColorRequest(String sheepColor) {}
 

@@ -62,6 +62,9 @@ public class User {
 
     public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
 
+    /** 닉네임을 바꾼다. 앞뒤 공백 제거와 글자 수 검증은 서비스에서 끝낸 뒤 부른다. */
+    public void changeNickname(String nickname) { this.nickname = nickname; }
+
     /** 양 프로필 색상을 바꾼다. 값 형식 검증은 서비스에서 끝낸 뒤 부른다. */
     public void changeSheepColor(String sheepColor) { this.sheepColor = sheepColor; }
 

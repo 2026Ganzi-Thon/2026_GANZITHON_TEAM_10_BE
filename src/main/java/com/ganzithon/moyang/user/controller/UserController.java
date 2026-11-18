@@ -5,6 +5,8 @@ import com.ganzithon.moyang.common.response.ApiResponse;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingRequest;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingResponse;
 import com.ganzithon.moyang.user.dto.UserDtos.MeResponse;
+import com.ganzithon.moyang.user.dto.UserDtos.NicknameRequest;
+import com.ganzithon.moyang.user.dto.UserDtos.NicknameResponse;
 import com.ganzithon.moyang.user.dto.UserDtos.SheepColorRequest;
 import com.ganzithon.moyang.user.dto.UserDtos.SheepColorResponse;
 import com.ganzithon.moyang.user.service.OnboardingService;
@@ -37,6 +39,15 @@ public class UserController {
     @GetMapping
     public ApiResponse<MeResponse> me() {
         return ApiResponse.ok(userService.me(currentUser.currentUserId()));
+    }
+
+    @Operation(summary = "닉네임 수정",
+            description = "내 양 닉네임을 바꿉니다. 앞뒤 공백을 지운 뒤 2~15자(이모지도 1자)여야 합니다. "
+                    + "가운데 공백과 특수문자는 허용하고 다른 사용자와 같은 닉네임도 됩니다(줄바꿈 · 탭 같은 제어 문자는 불가). "
+                    + "비어 있거나 글자 수가 맞지 않거나 null이면 400 INVALID_NICKNAME입니다. 응답의 nickname은 공백을 지운 저장값입니다.")
+    @PatchMapping("/nickname")
+    public ApiResponse<NicknameResponse> changeNickname(@RequestBody NicknameRequest request) {
+        return ApiResponse.ok(userService.changeNickname(currentUser.currentUserId(), request));
     }
 
     @Operation(summary = "양 색상 수정",

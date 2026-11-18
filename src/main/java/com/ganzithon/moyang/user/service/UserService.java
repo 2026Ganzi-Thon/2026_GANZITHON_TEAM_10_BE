@@ -5,6 +5,8 @@ import com.ganzithon.moyang.common.exception.ErrorCode;
 import com.ganzithon.moyang.user.domain.User;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingData;
 import com.ganzithon.moyang.user.dto.UserDtos.MeResponse;
+import com.ganzithon.moyang.user.dto.UserDtos.NicknameRequest;
+import com.ganzithon.moyang.user.dto.UserDtos.NicknameResponse;
 import com.ganzithon.moyang.user.dto.UserDtos.SheepColorRequest;
 import com.ganzithon.moyang.user.dto.UserDtos.SheepColorResponse;
 import com.ganzithon.moyang.user.repository.UserOnboardingRepository;
@@ -13,11 +15,13 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 내 정보 조회와 양 색상 수정. 닉네임 수정, 탈퇴는 이어지는 단위에서 이 서비스에 붙인다. */
+/** 내 정보 조회, 닉네임 · 양 색상 수정. 탈퇴는 이어지는 단위에서 이 서비스에 붙인다. */
 @Service
 @Transactional(readOnly = true)
 public class UserService {
 
+    private static final int MIN_NICKNAME = 2;
+    private static final int MAX_NICKNAME = 15;
     private static final Pattern SHEEP_COLOR = Pattern.compile("^[A-Z0-9_]{1,20}$");
 
     private final UserRepository users;
@@ -26,6 +30,28 @@ public class UserService {
     public UserService(UserRepository users, UserOnboardingRepository onboardings) {
         this.users = users;
         this.onboardings = onboardings;
+    }
+
+    /**
+     * 닉네임 수정. 앞뒤 공백을 지운 뒤 2~15자(이모지도 1자)만 본다.
+     * 가운데 공백과 특수문자는 허용하고(기본 닉네임 "졸린 양 #3"도 그대로 저장 가능), 중복도 허용한다.
+     * 줄바꿈 · 탭 같은 제어 문자가 글자 사이에 있으면 화면이 깨질 수 있어 거부한다.
+     */
+    @Transactional
+    public NicknameResponse changeNickname(long userId, NicknameRequest req) {
+        String nickname = req.nickname() == null ? "" : req.nickname().strip();
+        int length = nickname.codePointCount(0, nickname.length());
+        if (length < MIN_NICKNAME || length > MAX_NICKNAME || nickname.codePoints().anyMatch(UserService::isControl)) {
+            throw new BusinessException(ErrorCode.INVALID_NICKNAME);
+        }
+        User user = users.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        user.changeNickname(nickname);
+        return new NicknameResponse(user.getId(), user.getNickname());
+    }
+
+    private static boolean isControl(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.CONTROL || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     /**
