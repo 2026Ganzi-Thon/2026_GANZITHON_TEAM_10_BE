@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Profile;
  * 로그인(CurrentUserProvider)은 진짜 JWT 구현(JwtCurrentUserProvider)을 쓰므로 여기엔 없다. 그 외 프로필은 PortFallbacks(전부 막힘)를 쓴다.
  */
 @Configuration
-@Profile("local")
+@Profile("local & !prod") // local과 prod를 같이 켜도 운영에서는 꺼진다
 public class LocalStubs {
 
     @Bean
