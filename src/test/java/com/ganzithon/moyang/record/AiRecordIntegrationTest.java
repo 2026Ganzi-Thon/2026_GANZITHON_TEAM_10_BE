@@ -22,6 +22,7 @@ class AiRecordIntegrationTest {
     @Autowired DrawingRepository drawings;
     @Autowired ConversationRepository conversations;
     @Autowired ConversationMessageRepository messages;
+    @Autowired MeetingCardRepository meetingCards;
     @Autowired TransactionTemplate tx;
 
     @Test void realReaderPersistsAnalysisMessagesAndUserTitleAndPaysOnce() {
@@ -54,6 +55,25 @@ class AiRecordIntegrationTest {
         assertThat(detail.messages().get(0).sentAt().toInstant()).isEqualTo(source.get(0).getCreatedAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
         assertThat(records.complete(uid,id,"새 제목").sheepEarned()).isZero();
         assertThat(records.detail(uid,id).title()).isEqualTo("오늘의 나무");
+    }
+
+    @Test void meetingCardWithoutPersonalConversationCanBeSavedAndPaysOnce() {
+        long uid=71003,id=records.create(uid);
+        tx.executeWithoutResult(status -> {
+            var drawing=drawings.saveAndFlush(new Drawing(id,uid,null,Drawing.InputType.CANVAS,
+                    "모임에서 그린 그림","meeting-only.png","image/png",100));
+            meetingCards.saveAndFlush(new MeetingCard(81003L,uid,id,drawing.getId(),
+                    "모임에서 한 말","떠오른 생각","오늘 이야기",false));
+            records.cardReady(id);
+        });
+        assertThat(reader.find(id).orElseThrow().messages()).isEmpty();
+        assertThat(records.complete(uid,id,"모임 회고").sheepEarned()).isEqualTo(1);
+        var detail=records.detail(uid,id);
+        assertThat(detail.title()).isEqualTo("모임 회고");
+        assertThat(detail.messages()).isEmpty();
+        assertThat(detail.drawingDescription()).isEqualTo("모임에서 그린 그림");
+        assertThat(records.complete(uid,id,"다른 제목").sheepEarned()).isZero();
+        assertThat(records.detail(uid,id).title()).isEqualTo("모임 회고");
     }
 
     @Test void drawingWithoutCompletedCardCannotBeSaved() {

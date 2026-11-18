@@ -68,7 +68,7 @@ public class RecordService {
     }
     private void validate(Snapshot s,long id){
         if(s.recordId()!=id)throw error(ErrorCode.RECORD_NOT_READY);
-        if(blank(s.imageUrl())||s.imageUrl().length()>2048||s.messages()==null||s.messages().isEmpty())throw error(ErrorCode.RECORD_NOT_READY);
+        if(blank(s.imageUrl())||s.imageUrl().length()>2048||s.messages()==null)throw error(ErrorCode.RECORD_NOT_READY);
         int seq=1;for(var m:s.messages()){if(m==null||m.sequenceNo()!=seq++||!Set.of("USER","ASSISTANT").contains(m.role()==null?"":m.role())||blank(m.content())||m.sentAt()==null)throw error(ErrorCode.RECORD_NOT_READY);}
     }
     private static boolean blank(String s){return s==null||s.isBlank();}

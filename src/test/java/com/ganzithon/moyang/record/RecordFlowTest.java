@@ -54,7 +54,7 @@ class RecordFlowTest {
  @Test void draftAndUnreadyDataCannotBeCompleted(){long uid=IDS.incrementAndGet(),id=port.create(uid);
   assertThatThrownBy(()->saveRecord(uid,id)).isInstanceOf(BusinessException.class);port.cardReady(id);
   assertThatThrownBy(()->saveRecord(uid,id)).isInstanceOf(BusinessException.class);assertThat(sheep.balance(uid).balance()).isZero();
-  SOURCES.put(id,new Snapshot(id,"url",null,null,List.of()));
+  SOURCES.put(id,new Snapshot(id,"url",null,null,null));
   assertThatThrownBy(()->saveRecord(uid,id)).isInstanceOf(BusinessException.class);assertThat(records.today(uid).completed()).isFalse();
  }
  @Test void ownershipAndDeletedAccessAreRejected(){long uid=IDS.incrementAndGet(),id=ready(uid);saveRecord(uid,id);
