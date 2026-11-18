@@ -5,10 +5,13 @@ import com.ganzithon.moyang.common.response.ApiResponse;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingRequest;
 import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingResponse;
 import com.ganzithon.moyang.user.dto.UserDtos.MeResponse;
+import com.ganzithon.moyang.user.dto.UserDtos.SheepColorRequest;
+import com.ganzithon.moyang.user.dto.UserDtos.SheepColorResponse;
 import com.ganzithon.moyang.user.service.OnboardingService;
 import com.ganzithon.moyang.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +37,14 @@ public class UserController {
     @GetMapping
     public ApiResponse<MeResponse> me() {
         return ApiResponse.ok(userService.me(currentUser.currentUserId()));
+    }
+
+    @Operation(summary = "양 색상 수정",
+            description = "내 양 프로필 색상을 바꿉니다. 색 코드값은 프론트가 정하고 서버는 형식(영문 대문자·숫자·_ 1~20자)만 검사합니다. "
+                    + "null · 빈 값 · 형식 오류는 400 INVALID_REQUEST입니다. 바꾼 값은 GET /api/users/me의 sheepColor에 나옵니다.")
+    @PatchMapping("/sheep-color")
+    public ApiResponse<SheepColorResponse> changeSheepColor(@RequestBody SheepColorRequest request) {
+        return ApiResponse.ok(userService.changeSheepColor(currentUser.currentUserId(), request));
     }
 
     @Operation(summary = "온보딩 답 저장",

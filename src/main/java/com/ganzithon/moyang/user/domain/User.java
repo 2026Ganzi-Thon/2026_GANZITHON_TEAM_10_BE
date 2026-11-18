@@ -62,6 +62,9 @@ public class User {
 
     public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
 
+    /** 양 프로필 색상을 바꾼다. 값 형식 검증은 서비스에서 끝낸 뒤 부른다. */
+    public void changeSheepColor(String sheepColor) { this.sheepColor = sheepColor; }
+
     /** 온보딩을 저장했을 때 부른다. 고민 코드를 채우고 완료 표시를 한다(추천 주제가 이 값을 쓴다). */
     public void completeOnboarding(String themeCode) {
         this.onboardingCompleted = true;
