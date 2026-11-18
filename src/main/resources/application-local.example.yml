@@ -1,5 +1,9 @@
 # 이 파일을 복사해서 application-local.yml 로 이름을 바꿔 쓴다. (application-local.yml 은 커밋하지 않는다)
 # 실행: --spring.profiles.active=local
+# 로그인(데모 계정)용 값은 이 파일이나 .env 에 넣는다 (둘 다 커밋 금지). 키 이름 예:
+#   DEMO_PASSWORD=...          데모 계정 공통 비밀번호 (없으면 데모 계정을 만들지 않음)
+#   DEMO_ACCOUNT_COUNT=6       demo1 ~ demoN (기본 6)
+#   JWT_SECRET=...             32자 이상 (없으면 local은 임시 키로 실행, 운영은 기동 실패)
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/hackathon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8

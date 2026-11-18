@@ -13,3 +13,5 @@ cors:
 
 moyang:
   upload-dir: ${UPLOAD_DIR}   # 기본값 없음: 재배포 때 그림이 지워지지 않도록 jar 밖 경로를 꼭 지정
+  jwt:
+    secret: ${JWT_SECRET}     # 기본값 없음: 환경변수가 없으면 서버가 기동 실패한다(fail-fast). 32자 이상

@@ -34,7 +34,7 @@ class SheepAuthenticatedApiTest {
  @Test void missingTestIdentityIsRejected() throws Exception{assertThat(get("/api/sheep",null).statusCode()).isEqualTo(401);}
  @Test void portSpendingRollsBackWithItsCallerTransaction(){long uid=funded();assertThatThrownBy(()->new TransactionTemplate(manager).execute(s->{wool.spend(uid,"conversation:rollback:question:6");throw new IllegalStateException("conversation failed");})).isInstanceOf(IllegalStateException.class);assertThat(wool.balance(uid)).isEqualTo(1);}
  @TestConfiguration static class TestPorts {
-  @Bean CurrentUserProvider userProvider(){return ()->{var attrs=(ServletRequestAttributes)RequestContextHolder.getRequestAttributes();String value=attrs==null?null:attrs.getRequest().getHeader("X-Test-User");if(value==null)throw new BusinessException(ErrorCode.UNAUTHORIZED);try{return Long.parseLong(value);}catch(NumberFormatException e){throw new BusinessException(ErrorCode.UNAUTHORIZED);}};}
+  @Bean @Primary CurrentUserProvider userProvider(){return ()->{var attrs=(ServletRequestAttributes)RequestContextHolder.getRequestAttributes();String value=attrs==null?null:attrs.getRequest().getHeader("X-Test-User");if(value==null)throw new BusinessException(ErrorCode.UNAUTHORIZED);try{return Long.parseLong(value);}catch(NumberFormatException e){throw new BusinessException(ErrorCode.UNAUTHORIZED);}};}
   @Bean @Fallback WoolPort fallbackWool(){return new WoolPort(){public int balance(long uid){throw new AssertionError("fallback selected");}public void spend(long uid,String ref){throw new AssertionError("fallback selected");}};}
  }
 }
