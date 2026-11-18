@@ -28,8 +28,17 @@ public class SheepService {
     /** Internal record-save participant. Caller must validate actual record ownership/completion BEFORE invoking. */
     @Transactional(propagation=Propagation.MANDATORY)
     public SheepAwardResponse awardRecord(long userId,long recordId){
+        return awardAt(userId,recordId,null);
+    }
+    /** Records passes its server-captured Seoul completion time so a wallet wait cannot change the reward day. */
+    @Transactional(propagation=Propagation.MANDATORY)
+    public SheepAwardResponse awardRecordAt(long userId,long recordId,LocalDateTime completedAt){
+        if(completedAt==null)throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        return awardAt(userId,recordId,completedAt);
+    }
+    private SheepAwardResponse awardAt(long userId,long recordId,LocalDateTime completedAt){
         validateUser(userId);positive(recordId);
-        var wallet=lockWallet(userId);var now=now();
+        var wallet=lockWallet(userId);var now=completedAt==null?now():completedAt;
         var decision=rewards.lockRecord(recordId);
         if(decision.isPresent()){
             if(decision.get().getUserId()!=userId)throw new BusinessException(ErrorCode.FORBIDDEN);
