@@ -37,14 +37,17 @@ public class MeetingLifecycleService {
     private final MeetingParticipantRepository participants;
     private final SheepService sheep;
     private final MeetingQueryService time;
+    private final MeetingPhaseService phases;
     private final TransactionTemplate transaction;
 
     public MeetingLifecycleService(MeetingRepository meetings, MeetingParticipantRepository participants,
-                                   SheepService sheep, MeetingQueryService time, PlatformTransactionManager tm) {
+                                   SheepService sheep, MeetingQueryService time, MeetingPhaseService phases,
+                                   PlatformTransactionManager tm) {
         this.meetings = meetings;
         this.participants = participants;
         this.sheep = sheep;
         this.time = time;
+        this.phases = phases;
         this.transaction = new TransactionTemplate(tm);
     }
 
@@ -66,8 +69,10 @@ public class MeetingLifecycleService {
         if (count < MIN_TO_START) {
             throw new BusinessException(ErrorCode.NOT_ENOUGH_PARTICIPANTS);
         }
-        meeting.start(time.now());
+        LocalDateTime now = time.now();
+        meeting.start(now);
         meetings.saveAndFlush(meeting);
+        phases.announceStart(meeting, now);
         return new StartMeetingResponse(meetingId, meeting.getStatus().name(), meeting.getPhase().name(), (int) count);
     }
 
@@ -148,6 +153,7 @@ public class MeetingLifecycleService {
         if (entered >= MIN_TO_START) {
             meeting.start(now);
             meetings.saveAndFlush(meeting);
+            phases.announceStart(meeting, now);
         } else if (waitExpired(meeting, now)) {
             cancelForLackOfParticipants(meeting, now);
         }

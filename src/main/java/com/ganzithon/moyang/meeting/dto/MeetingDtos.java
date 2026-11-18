@@ -63,6 +63,9 @@ public final class MeetingDtos {
                                    int submittedDrawingCount, int participantCount, int endAgreedCount,
                                    OffsetDateTime endAt, OffsetDateTime deleteAt, List<ChatMessageItem> messages) {}
 
+    /** 다음 단계로 넘긴 결과. topic은 모임 주제. */
+    public record PhaseNextResponse(long meetingId, String phase, String topic) {}
+
     /** 실시간 모임 시작 결과. 시작하면 status=IN_PROGRESS, phase=INTRO. */
     public record StartMeetingResponse(long meetingId, String status, String phase, int participantCount) {}
 

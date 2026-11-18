@@ -113,6 +113,20 @@ class MeetingChatApiTest {
         return id;
     }
 
+    /** 시작한 실시간 모임을 방장이 그림 단계(DRAWING)로 넘긴다. 그림은 이 단계부터 올릴 수 있다. */
+    long drawingPhaseLive(User host, User guest) throws Exception {
+        long id = startedLive(host, guest);
+        mvc().perform(post("/api/meetings/" + id + "/phase/next").header("Authorization", bearer(host)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.phase").value("DRAWING"));
+        return id;
+    }
+
+    /** 지금까지 쌓인 가장 마지막 메시지 번호(시작·단계 안내 같은 시스템 메시지를 건너뛰고 폴링하려고). */
+    long lastMessageId(long id) {
+        List<com.ganzithon.moyang.meeting.domain.MeetingMessage> all = messages.findByMeetingIdOrderByIdAsc(id);
+        return all.get(all.size() - 1).getId();
+    }
+
     ResultActions send(User u, long id, String json) throws Exception {
         return mvc().perform(post("/api/meetings/" + id + "/messages").header("Authorization", bearer(u))
                 .contentType(MediaType.APPLICATION_JSON).content(json));
@@ -173,16 +187,20 @@ class MeetingChatApiTest {
                 .andExpect(jsonPath("$.data.endAgreedCount").value(0))
                 .andExpect(jsonPath("$.data.endAt").doesNotExist())
                 .andExpect(jsonPath("$.data.deleteAt").doesNotExist())
-                .andExpect(jsonPath("$.data.messages.length()").value(1))
-                .andExpect(jsonPath("$.data.messages[0].type").value("TEXT"))
-                .andExpect(jsonPath("$.data.messages[0].senderNickname").value("방장양"))
-                .andExpect(jsonPath("$.data.messages[0].content").value("저는 오늘 조금 지쳐서 왔어요"))
+                // 시작 안내(SYSTEM) 한 줄 + 방장 메시지
+                .andExpect(jsonPath("$.data.messages.length()").value(2))
+                .andExpect(jsonPath("$.data.messages[0].type").value("SYSTEM"))
+                .andExpect(jsonPath("$.data.messages[0].senderNickname").doesNotExist())
                 .andExpect(jsonPath("$.data.messages[0].mine").value(false))
-                .andExpect(jsonPath("$.data.messages[0].imageUrl").doesNotExist())
+                .andExpect(jsonPath("$.data.messages[1].type").value("TEXT"))
+                .andExpect(jsonPath("$.data.messages[1].senderNickname").value("방장양"))
+                .andExpect(jsonPath("$.data.messages[1].content").value("저는 오늘 조금 지쳐서 왔어요"))
+                .andExpect(jsonPath("$.data.messages[1].mine").value(false))
+                .andExpect(jsonPath("$.data.messages[1].imageUrl").doesNotExist())
                 // 응답에 userId는 없다
-                .andExpect(jsonPath("$.data.messages[0].userId").doesNotExist());
+                .andExpect(jsonPath("$.data.messages[1].userId").doesNotExist());
 
-        poll(host, id).andExpect(jsonPath("$.data.messages[0].mine").value(true));
+        poll(host, id).andExpect(jsonPath("$.data.messages[1].mine").value(true));
     }
 
     @Test
@@ -196,15 +214,16 @@ class MeetingChatApiTest {
         assertThat(first).isLessThan(second);
         assertThat(second).isLessThan(third);
 
-        poll(guest, id).andExpect(jsonPath("$.data.messages.length()").value(3))
-                .andExpect(jsonPath("$.data.messages[0].content").value("하나"))
-                .andExpect(jsonPath("$.data.messages[2].content").value("셋"));
+        poll(guest, id).andExpect(jsonPath("$.data.messages.length()").value(4)) // 시작 안내 + 3개
+                .andExpect(jsonPath("$.data.messages[0].type").value("SYSTEM"))
+                .andExpect(jsonPath("$.data.messages[1].content").value("하나"))
+                .andExpect(jsonPath("$.data.messages[3].content").value("셋"));
         poll(guest, id, "?afterId=" + first).andExpect(jsonPath("$.data.messages.length()").value(2))
                 .andExpect(jsonPath("$.data.messages[0].content").value("둘"));
         poll(guest, id, "?afterId=" + third).andExpect(jsonPath("$.data.messages").isEmpty())
                 // 새 메시지가 없어도 진행 정보는 온다
                 .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
-        poll(guest, id, "?afterId=-5").andExpect(jsonPath("$.data.messages.length()").value(3));
+        poll(guest, id, "?afterId=-5").andExpect(jsonPath("$.data.messages.length()").value(4));
         expectError(poll(guest, id, "?afterId=abc"), 400, "INVALID_REQUEST");
     }
 
@@ -212,7 +231,8 @@ class MeetingChatApiTest {
     void sharedDrawingShowsImageUrlAndCountsEachSenderOnce() throws Exception {
         User host = user();
         User guest = user();
-        long id = startedLive(host, guest);
+        long id = drawingPhaseLive(host, guest);
+        long after = lastMessageId(id);
         Drawing drawing = drawingOf(guest);
 
         send(guest, id, "{\"type\":\"DRAWING\",\"drawingId\":" + drawing.getId()
@@ -221,7 +241,8 @@ class MeetingChatApiTest {
         send(guest, id, "{\"type\":\"DRAWING\",\"drawingId\":" + drawingOf(guest).getId() + "}")
                 .andExpect(status().isOk());
 
-        poll(host, id).andExpect(jsonPath("$.data.submittedDrawingCount").value(1))
+        poll(host, id, "?afterId=" + after).andExpect(jsonPath("$.data.submittedDrawingCount").value(1))
+                .andExpect(jsonPath("$.data.phase").value("DRAWING"))
                 .andExpect(jsonPath("$.data.messages[0].type").value("DRAWING"))
                 .andExpect(jsonPath("$.data.messages[0].senderNickname").value("손님양"))
                 .andExpect(jsonPath("$.data.messages[0].content").value("창문이 하나뿐인 방을 그렸어요"))
@@ -237,13 +258,14 @@ class MeetingChatApiTest {
     void drawingErrors() throws Exception {
         User host = user();
         User guest = user();
-        long id = startedLive(host, guest);
+        long id = drawingPhaseLive(host, guest);
+        long after = lastMessageId(id);
 
         expectError(send(guest, id, "{\"type\":\"DRAWING\",\"drawingId\":" + drawingOf(host).getId() + "}"),
                 403, "FORBIDDEN");
         expectError(send(guest, id, "{\"type\":\"DRAWING\",\"drawingId\":99999999}"), 404, "DRAWING_NOT_FOUND");
         expectError(send(guest, id, "{\"type\":\"DRAWING\"}"), 400, "INVALID_REQUEST");
-        poll(guest, id).andExpect(jsonPath("$.data.messages").isEmpty());
+        poll(guest, id, "?afterId=" + after).andExpect(jsonPath("$.data.messages").isEmpty());
     }
 
     @Test
@@ -273,7 +295,7 @@ class MeetingChatApiTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
 
         sendText(host, id, "  앞뒤 공백  ").andExpect(status().isOk());
-        poll(guest, id, "").andExpect(jsonPath("$.data.messages[2].content").value("앞뒤 공백"));
+        poll(guest, id, "").andExpect(jsonPath("$.data.messages[3].content").value("앞뒤 공백"));
     }
 
     // ---- 권한 · 상태 ----
@@ -363,7 +385,7 @@ class MeetingChatApiTest {
         setStatus(id, "ENDED", endedAt);
         expectError(sendText(host, id, "끝난 뒤에는 못 보내요"), 409, "MEETING_NOT_IN_PROGRESS");
         poll(guest, id).andExpect(jsonPath("$.data.status").value("ENDED"))
-                .andExpect(jsonPath("$.data.messages.length()").value(1))
+                .andExpect(jsonPath("$.data.messages.length()").value(2)) // 시작 안내 + 마지막 인사
                 .andExpect(jsonPath("$.data.deleteAt").value(
                         org.hamcrest.Matchers.startsWith(endedAt.plusHours(24).toLocalDate().toString())));
 
@@ -416,7 +438,7 @@ class MeetingChatApiTest {
         pool.shutdown();
 
         List<Long> ids = messages.findByMeetingIdOrderByIdAsc(id).stream().map(m -> m.getId()).toList();
-        assertThat(ids).hasSize(perUser * 2).isSorted();
+        assertThat(ids).hasSize(perUser * 2 + 1).isSorted(); // + 시작 안내
     }
 
     // ---- 포트 진짜 구현 ----
@@ -426,7 +448,7 @@ class MeetingChatApiTest {
         User host = user();
         User guest = user();
         User outsider = user();
-        long id = startedLive(host, guest);
+        long id = drawingPhaseLive(host, guest);
         Drawing drawing = drawingOf(guest);
         Drawing unshared = drawingOf(guest);
 
@@ -456,6 +478,8 @@ class MeetingChatApiTest {
                 .andExpect(status().isOk());
         mvc().perform(post("/api/meetings/" + id + "/start").header("Authorization", bearer(host)))
                 .andExpect(status().isOk());
+        mvc().perform(post("/api/meetings/" + id + "/phase/next").header("Authorization", bearer(host)))
+                .andExpect(status().isOk());
         Drawing drawing = drawingOf(guest);
         send(guest, id, "{\"type\":\"DRAWING\",\"drawingId\":" + drawing.getId() + "}").andExpect(status().isOk());
 
@@ -467,7 +491,7 @@ class MeetingChatApiTest {
     void readerGivesCardMaterialPerParticipant() throws Exception {
         User host = user();
         User guest = user();
-        long id = startedLive(host, guest);
+        long id = drawingPhaseLive(host, guest);
         Drawing first = drawingOf(guest);
         Drawing latest = drawingOf(guest);
         sendText(host, id, "방장 첫마디").andExpect(status().isOk());

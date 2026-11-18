@@ -15,10 +15,12 @@ import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingDetailResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingListResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MyMeetingsResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.EnterMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.PhaseNextResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.StartMeetingResponse;
 import com.ganzithon.moyang.meeting.service.MeetingChatService;
 import com.ganzithon.moyang.meeting.service.MeetingCommandService;
 import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
+import com.ganzithon.moyang.meeting.service.MeetingPhaseService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,16 +40,29 @@ public class MeetingController {
     private final MeetingCommandService command;
     private final MeetingLifecycleService lifecycle;
     private final MeetingChatService chat;
+    private final MeetingPhaseService phases;
     private final CurrentUserProvider currentUser;
 
     public MeetingController(MeetingQueryService query, MeetingCommandService command,
                              MeetingLifecycleService lifecycle, MeetingChatService chat,
-                             CurrentUserProvider currentUser) {
+                             MeetingPhaseService phases, CurrentUserProvider currentUser) {
         this.query = query;
         this.command = command;
         this.lifecycle = lifecycle;
         this.chat = chat;
+        this.phases = phases;
         this.currentUser = currentUser;
+    }
+
+    @Operation(summary = "주제 건너뛰기 (다음 단계로)",
+            description = "진행 단계를 하나 넘긴다(INTRO → DRAWING → SHARING → CLOSING). 권한자만: 실시간은 방장, 예약은 방장이 입장해 있으면 방장, "
+                    + "방장 없이 시작했다면 가장 먼저 입장한 사람(상세 조회의 canSkip). 단계가 바뀌면 채팅에 안내(SYSTEM) 메시지가 남는다. "
+                    + "그림 단계(DRAWING)에서 참여자 모두가 그림을 올리면 서버가 자동으로 SHARING으로 넘기므로 버튼은 필요 없다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_PARTICIPANT(403), MEETING_NOT_IN_PROGRESS(409), "
+                    + "NO_SKIP_PERMISSION(403), LAST_PHASE(409, 이미 마무리 단계).")
+    @PostMapping("/{meetingId}/phase/next")
+    public ApiResponse<PhaseNextResponse> nextPhase(@PathVariable long meetingId) {
+        return ApiResponse.ok(phases.next(currentUser.currentUserId(), meetingId));
     }
 
     @Operation(summary = "모임 채팅 보내기 · 그림 공유",
@@ -56,7 +71,8 @@ public class MeetingController {
                     + "모임 채팅에서는 위기 감지를 하지 않는다. "
                     + "오류: INVALID_MESSAGE_TYPE · EMPTY_CONTENT · CONTENT_TOO_LONG · INVALID_REQUEST(400), "
                     + "MEETING_NOT_FOUND(404, 없거나 종료 24시간 뒤 삭제), NOT_PARTICIPANT(403), "
-                    + "MEETING_NOT_IN_PROGRESS(409), FORBIDDEN(403, 내 그림이 아님), DRAWING_NOT_FOUND(404).")
+                    + "MEETING_NOT_IN_PROGRESS(409), DRAWING_NOT_OPEN(409, 자기소개 단계(INTRO)에서는 그림 공유 불가), "
+                    + "FORBIDDEN(403, 내 그림이 아님), DRAWING_NOT_FOUND(404).")
     @PostMapping("/{meetingId}/messages")
     public ApiResponse<SendMessageResponse> sendMessage(@PathVariable long meetingId,
                                                         @RequestBody SendMessageRequest request) {

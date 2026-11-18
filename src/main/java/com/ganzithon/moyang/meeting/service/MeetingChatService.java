@@ -5,6 +5,7 @@ import com.ganzithon.moyang.common.exception.ErrorCode;
 import com.ganzithon.moyang.drawing.domain.Drawing;
 import com.ganzithon.moyang.drawing.repository.DrawingRepository;
 import com.ganzithon.moyang.meeting.domain.Meeting;
+import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingPhase;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingStatus;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingType;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MessageType;
@@ -36,15 +37,17 @@ public class MeetingChatService {
     private final MeetingMessageRepository messages;
     private final DrawingRepository drawings;
     private final MeetingQueryService time;
+    private final MeetingPhaseService phases;
 
     public MeetingChatService(MeetingRepository meetings, MeetingParticipantRepository participants,
                               MeetingMessageRepository messages, DrawingRepository drawings,
-                              MeetingQueryService time) {
+                              MeetingQueryService time, MeetingPhaseService phases) {
         this.meetings = meetings;
         this.participants = participants;
         this.messages = messages;
         this.drawings = drawings;
         this.time = time;
+        this.phases = phases;
     }
 
     /**
@@ -74,6 +77,10 @@ public class MeetingChatService {
             throw new BusinessException(ErrorCode.MEETING_NOT_IN_PROGRESS);
         }
 
+        if (type == MessageType.DRAWING && meeting.getPhase() == MeetingPhase.INTRO) {
+            throw new BusinessException(ErrorCode.DRAWING_NOT_OPEN);
+        }
+
         MeetingMessage message;
         if (type == MessageType.DRAWING) {
             Drawing drawing = drawings.findById(req.drawingId())
@@ -86,6 +93,11 @@ public class MeetingChatService {
             message = MeetingMessage.text(meetingId, userId, content, now);
         }
         MeetingMessage saved = messages.saveAndFlush(message);
+        // 그림 단계에서 참여자 모두가 그림을 올렸으면 서버가 자동으로 그림 이야기(SHARING) 단계로 넘긴다
+        if (type == MessageType.DRAWING && meeting.getPhase() == MeetingPhase.DRAWING
+                && messages.countDrawingSubmitters(meetingId) >= participants.countActiveByMeetingId(meetingId)) {
+            phases.advance(meeting, now);
+        }
         return new SendMessageResponse(saved.getId(), MeetingQueryService.toOffset(saved.getCreatedAt()));
     }
 
