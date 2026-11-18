@@ -11,7 +11,10 @@ import com.ganzithon.moyang.meeting.dto.MeetingDtos.JoinMeetingResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingDetailResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingListResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MyMeetingsResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.EnterMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.StartMeetingResponse;
 import com.ganzithon.moyang.meeting.service.MeetingCommandService;
+import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,12 +32,14 @@ public class MeetingController {
 
     private final MeetingQueryService query;
     private final MeetingCommandService command;
+    private final MeetingLifecycleService lifecycle;
     private final CurrentUserProvider currentUser;
 
     public MeetingController(MeetingQueryService query, MeetingCommandService command,
-                             CurrentUserProvider currentUser) {
+                             MeetingLifecycleService lifecycle, CurrentUserProvider currentUser) {
         this.query = query;
         this.command = command;
+        this.lifecycle = lifecycle;
         this.currentUser = currentUser;
     }
 
@@ -45,6 +50,29 @@ public class MeetingController {
     @PostMapping
     public ApiResponse<CreateMeetingResponse> create(@RequestBody CreateMeetingRequest request) {
         return ApiResponse.ok(command.create(currentUser.currentUserId(), request));
+    }
+
+    @Operation(summary = "실시간 모임 시작 (방장)",
+            description = "지금 모이는 모양(LIVE)을 방장이 시작한다. 대기실(OPEN)에서 방장 포함 2명 이상일 때만 되고, "
+                    + "시작하면 status=IN_PROGRESS, phase=INTRO. 시작 후에는 신규 입장 불가·목록에서 빠지고 양털 추가 차감·환불은 없다. "
+                    + "다른 참여자는 상세 조회(폴링)에서 status=IN_PROGRESS를 받으면 채팅방으로 이동한다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_HOST(403), NOT_LIVE_MEETING(400, 예약 모임), "
+                    + "ALREADY_STARTED(409), NOT_ENOUGH_PARTICIPANTS(409, 방장 포함 2명 미만).")
+    @PostMapping("/{meetingId}/start")
+    public ApiResponse<StartMeetingResponse> start(@PathVariable long meetingId) {
+        return ApiResponse.ok(lifecycle.start(currentUser.currentUserId(), meetingId));
+    }
+
+    @Operation(summary = "예약 모임 입장",
+            description = "예약 모임(SCHEDULED)에 실제로 들어왔다고 서버에 알린다. 방장과 신청을 유지한 사람만, 시작 5분 전(상세의 enterOpenAt)부터. "
+                    + "프론트는 5분 전 수동 입장, 1분 전 대기 화면을 켜 둔 사람은 자동으로 이 API를 부른다. 같은 사람이 다시 불러도 안전하다. "
+                    + "서버는 예정 시각에 입장자 2명 이상이면 시작(방장이 없어도), 아니면 최대 2분 기다리다 2명 미만이면 자동 취소하고 "
+                    + "참여자와 방장에게 양털을 전액 환불한다. 시작·취소·환불은 한 번만 처리된다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_JOINED(403), NOT_SCHEDULED_MEETING(400, 실시간 모임), "
+                    + "ENTER_NOT_OPEN(409, 5분 전 이전), MEETING_NOT_JOINABLE(409, 취소·종료·대기 시간 초과, 또는 시작 후 처음 입장).")
+    @PostMapping("/{meetingId}/enter")
+    public ApiResponse<EnterMeetingResponse> enter(@PathVariable long meetingId) {
+        return ApiResponse.ok(lifecycle.enter(currentUser.currentUserId(), meetingId));
     }
 
     @Operation(summary = "모임 신청 · 대기실 입장",

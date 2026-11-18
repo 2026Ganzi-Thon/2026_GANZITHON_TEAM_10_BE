@@ -50,6 +50,10 @@ public enum ErrorCode {
     NOT_JOINED(HttpStatus.FORBIDDEN, "신청하지 않은 모임이에요."),
     NOT_HOST(HttpStatus.FORBIDDEN, "방장만 할 수 있어요."),
     HOST_CANNOT_LEAVE(HttpStatus.FORBIDDEN, "방장은 나갈 수 없어요. 모임을 취소해 주세요."),
+    NOT_LIVE_MEETING(HttpStatus.BAD_REQUEST, "지금 모이는 모양(실시간 모임)만 직접 시작할 수 있어요."),
+    NOT_SCHEDULED_MEETING(HttpStatus.BAD_REQUEST, "미리 약속한 모양(예약 모임)만 입장 기록을 남길 수 있어요."),
+    NOT_ENOUGH_PARTICIPANTS(HttpStatus.CONFLICT, "방장을 포함해 2명 이상 모여야 시작할 수 있어요."),
+    ENTER_NOT_OPEN(HttpStatus.CONFLICT, "아직 입장할 수 있는 시간이 아니에요. 시작 5분 전부터 입장할 수 있어요."),
     ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
 
     // record

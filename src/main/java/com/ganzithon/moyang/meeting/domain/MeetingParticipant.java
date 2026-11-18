@@ -36,6 +36,9 @@ public class MeetingParticipant {
     /** 신청을 취소한 시각. null이면 참여 중. 취소해도 행은 남겨 같은 모임에 다시 신청하지 못하게 한다. */
     private LocalDateTime canceledAt;
 
+    /** 예약 모임에 실제로 입장한 시각. null이면 아직 입장하지 않았다(시작 판단에 쓴다). */
+    private LocalDateTime enteredAt;
+
     protected MeetingParticipant() {}
 
     public MeetingParticipant(long meetingId, long userId, String meetingNickname, LocalDateTime joinedAt) {
@@ -52,7 +55,18 @@ public class MeetingParticipant {
     public LocalDateTime getJoinedAt() { return joinedAt; }
     public LocalDateTime getCanceledAt() { return canceledAt; }
 
+    public LocalDateTime getEnteredAt() { return enteredAt; }
+
     public boolean isActive() { return canceledAt == null; }
+
+    public boolean hasEntered() { return enteredAt != null; }
+
+    /** 입장 기록. 이미 입장했으면 처음 시각을 유지한다(재입장해도 순서가 바뀌지 않게). */
+    public void enter(LocalDateTime now) {
+        if (enteredAt == null) {
+            this.enteredAt = now;
+        }
+    }
 
     public void cancel(LocalDateTime now) {
         this.canceledAt = now;

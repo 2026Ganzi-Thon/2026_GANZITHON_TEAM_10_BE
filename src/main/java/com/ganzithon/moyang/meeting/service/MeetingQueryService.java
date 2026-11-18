@@ -113,11 +113,26 @@ public class MeetingQueryService {
                 MeetingDefaults.RECOMMENDED_FOR, m.getHostUserId(), isHost,
                 // 시작 권한은 실시간 모임의 방장만, 대기실(OPEN)에서 방장 포함 2명 이상일 때
                 !scheduled && isHost && status == MeetingStatus.OPEN && count >= MeetingDefaults.MIN_PARTICIPANTS,
-                // 주제 건너뛰기 권한: 진행 중일 때 방장 (방장 없이 시작한 모임의 '첫 입장자' 규칙은 시작 단위에서 추가)
-                status == MeetingStatus.IN_PROGRESS && isHost,
+                // 주제 건너뛰기 권한: 진행 중일 때 방장, 방장 없이 시작한 예약 모임은 가장 먼저 입장한 참여자
+                status == MeetingStatus.IN_PROGRESS && mine != null && skipperUserId(m) == userId,
                 scheduled ? toOffset(m.getStartAt().minus(Meeting.ENTER_OPEN_BEFORE)) : null,
                 scheduled ? toOffset(m.getStartAt().minus(Meeting.REFUND_DEADLINE_BEFORE)) : null,
-                m.getCancelReason() == null ? null : m.getCancelReason().name());
+                m.getCancelReason() == null ? null : m.getCancelReason().name(),
+                m.getPhase() == null ? null : m.getPhase().name());
+    }
+
+    /**
+     * 주제 건너뛰기 권한자. 실시간은 방장. 예약은 방장이 입장해 있으면 방장, 방장 없이 시작했다면 가장 먼저 입장한 사람.
+     * 입장 기록이 아직 없는 경우(방장이 들어오기 전)에도 방장을 권한자로 본다.
+     */
+    long skipperUserId(Meeting m) {
+        if (m.getType() == MeetingType.LIVE) {
+            return m.getHostUserId();
+        }
+        List<MeetingParticipant> entered = participants
+                .findByMeetingIdAndCanceledAtIsNullAndEnteredAtIsNotNullOrderByEnteredAtAscIdAsc(m.getId());
+        boolean hostEntered = entered.stream().anyMatch(p -> p.getUserId() == m.getHostUserId());
+        return entered.isEmpty() || hostEntered ? m.getHostUserId() : entered.get(0).getUserId();
     }
 
     public MyMeetingsResponse mine(long userId) {
