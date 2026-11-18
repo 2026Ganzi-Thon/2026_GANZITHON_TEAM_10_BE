@@ -6,6 +6,9 @@ import com.ganzithon.moyang.ai.domain.Conversation;
 import com.ganzithon.moyang.ai.domain.ConversationMessage;
 import com.ganzithon.moyang.ai.repository.ConversationRepository;
 import com.ganzithon.moyang.ai.repository.ConversationMessageRepository;
+import com.ganzithon.moyang.ai.repository.MeetingCardRepository;
+import com.ganzithon.moyang.ai.dto.ConversationDtos.RecordView;
+import java.util.Optional;
 
 import com.ganzithon.moyang.common.port.Ports.RecordPort;
 import com.ganzithon.moyang.ai.service.ConversationAi;
@@ -16,6 +19,7 @@ import com.ganzithon.moyang.ai.service.ConversationAi.Question;
 import com.ganzithon.moyang.common.exception.BusinessException;
 import com.ganzithon.moyang.common.exception.ErrorCode;
 import com.ganzithon.moyang.ai.dto.ConversationDtos.CardView;
+import com.ganzithon.moyang.ai.dto.ConversationDtos.AnalysisView;
 import com.ganzithon.moyang.ai.dto.ConversationDtos.DetailResponse;
 import com.ganzithon.moyang.ai.dto.ConversationDtos.DrawingView;
 import com.ganzithon.moyang.ai.dto.ConversationDtos.EndResponse;
@@ -58,11 +62,13 @@ public class ConversationService {
     private final TopicReader topics;
     private final WoolPort wool;
     private final TransactionTemplate tx;
+    private final MeetingCardRepository meetingCards;
 
     public ConversationService(ConversationRepository conversations, ConversationMessageRepository messages,
                                DrawingRepository drawings, RecordPort records, ConversationAi ai,
                                UserContextProvider users, TopicReader topics, WoolPort wool,
-                               TransactionTemplate tx) {
+                               TransactionTemplate tx, MeetingCardRepository meetingCards) {
+        this.meetingCards = meetingCards;
         this.conversations = conversations;
         this.messages = messages;
         this.drawings = drawings;
@@ -219,9 +225,13 @@ public class ConversationService {
                 throw new BusinessException(ErrorCode.CONVERSATION_ALREADY_ENDED);
             }
             fresh.end(card.whatISaid(), card.thoughts(), card.todaysStory(), card.fallback());
+            if (card.analysis() != null) {
+                var a = card.analysis();
+                fresh.analyzed(a.mainElements(), a.spatialComposition(), a.lineExpression(), a.emotionMeaning());
+            }
             records.cardReady(fresh.getRecordId());
             return new EndResponse(fresh.getId(), fresh.getRecordId(), fresh.getStatus().name(), drawingView(drawing, ctx),
-                    cardView(fresh), fresh.isCardFallback());
+                    cardView(fresh), analysisView(fresh), fresh.isCardFallback());
         });
     }
 
@@ -231,13 +241,40 @@ public class ConversationService {
         List<ConversationMessage> history = messages.findByConversationIdOrderByIdAsc(c.getId());
         boolean questionPending = !history.isEmpty() && history.get(history.size() - 1).isAi();
         boolean canExtend = !c.isEnded() && !questionPending && !c.hasFreeQuestionLeft() && c.canAddExtraQuestion();
-        List<MessageView> views = history.stream()
+        return new DetailResponse(c.getId(), drawing.getId(), c.getRecordId(), c.getStatus().name(),
+                messageViews(history), c.remainingFreeQuestions(), canExtend, drawingView(drawing, context(drawing)),
+                c.isEnded() ? cardView(c) : null, analysisView(c), c.isCardFallback());
+    }
+
+    /**
+     * 기록 상세(record 담당 박준석)용: recordId로 그림 · 회고 카드 · 대화 내용을 한 번에 돌려준다.
+     * 카드는 개인 대화가 끝났으면 그 카드, 아니면 모임 회고 카드 (둘 다 없으면 null = 아직 준비 안 됨).
+     * 대화 내용은 개인 대화만 (모임 채팅은 승효 담당이고 24시간 뒤 삭제). 소유자 검증은 부르는 쪽에서 한다.
+     */
+    public Optional<RecordView> recordView(long recordId) {
+        return drawings.findByRecordId(recordId).map(drawing -> {
+            Optional<Conversation> conv = conversations.findByRecordId(recordId);
+            List<MessageView> views = conv.map(c -> messageViews(messages.findByConversationIdOrderByIdAsc(c.getId())))
+                    .orElse(List.of());
+            TopicInfo topic = topicOf(drawing);
+            DrawingView drawingView = new DrawingView(drawing.getId(), drawing.imageUrl(),
+                    topic == null ? null : topic.title(), drawing.getNote());
+            if (conv.isPresent() && conv.get().isEnded()) {
+                Conversation c = conv.get();
+                return new RecordView(recordId, drawingView, cardView(c), analysisView(c), c.isCardFallback(), views);
+            }
+            return meetingCards.findFirstByRecordIdOrderByIdDesc(recordId)
+                    .map(m -> new RecordView(recordId, drawingView,
+                            new CardView(m.getWhatISaid(), m.getThoughts(), m.getTodaysStory()), null, m.isFallback(), views))
+                    .orElseGet(() -> new RecordView(recordId, drawingView, null, null, false, views));
+        });
+    }
+
+    private static List<MessageView> messageViews(List<ConversationMessage> history) {
+        return history.stream()
                 .map(m -> new MessageView(m.getId(), m.getRole().name(), m.getType().name(), m.getContent(),
                         m.getQuestionOrder(), ConversationDtos.kst(m.getCreatedAt())))
                 .toList();
-        return new DetailResponse(c.getId(), drawing.getId(), c.getRecordId(), c.getStatus().name(), views,
-                c.remainingFreeQuestions(), canExtend, drawingView(drawing, context(drawing)),
-                c.isEnded() ? cardView(c) : null, c.isCardFallback());
     }
 
     public InProgressResponse inProgress(long userId, String status) {
@@ -302,6 +339,16 @@ public class ConversationService {
 
     private CardView cardView(Conversation c) {
         return new CardView(c.getCardWhatISaid(), c.getCardThoughts(), c.getCardTodaysStory());
+    }
+
+    /** 그림 자세히 살펴보기 4칸. 하나도 없으면(fallback 카드 · 진행 중) null. */
+    private static AnalysisView analysisView(Conversation c) {
+        if (c.getMainElements() == null && c.getSpatialComposition() == null && c.getLineExpression() == null
+                && c.getEmotionMeaning() == null) {
+            return null;
+        }
+        return new AnalysisView(c.getMainElements(), c.getSpatialComposition(), c.getLineExpression(),
+                c.getEmotionMeaning());
     }
 
     /** forCard=true면 위기 표현이 담긴 답을 뺀다 (카드에 그대로 적히지 않게). */

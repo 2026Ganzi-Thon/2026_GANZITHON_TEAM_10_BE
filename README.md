@@ -126,3 +126,7 @@ docs(readme): 실행 방법 수정
 ## Sheep 기능 개발
 
 양털 API·내부 지급/사용/환불·WoolPort 연결·DB·테스트는 [docs/sheep.md](docs/sheep.md)를 참고합니다.
+
+## Records 기능 개발
+
+기록 API·엔티티·RecordPort·그림/AI 조회 연동 계약은 [docs/records.md](docs/records.md)를 참고합니다.

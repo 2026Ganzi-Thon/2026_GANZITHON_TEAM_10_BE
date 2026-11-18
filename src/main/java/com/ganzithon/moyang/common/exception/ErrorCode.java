@@ -39,6 +39,11 @@ public enum ErrorCode {
     // auth · user (백승효)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않아요."),
 
+    // record
+    RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요."),
+    RECORD_NOT_READY(HttpStatus.CONFLICT, "회고 저장에 필요한 데이터가 아직 준비되지 않았어요."),
+    RECORD_SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "그림·AI 기록 연동이 아직 준비되지 않았어요."),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;
