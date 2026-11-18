@@ -57,5 +57,11 @@ public class User {
 
     public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
 
+    /** 온보딩을 저장했을 때 부른다. 고민 코드를 채우고 완료 표시를 한다(추천 주제가 이 값을 쓴다). */
+    public void completeOnboarding(String themeCode) {
+        this.onboardingCompleted = true;
+        this.themeCode = themeCode;
+    }
+
     public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 }
