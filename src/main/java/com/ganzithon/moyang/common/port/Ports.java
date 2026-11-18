@@ -50,7 +50,11 @@ public final class Ports {
         void spend(long userId, String referenceId);
     }
 
-    /** 그림이 사용자가 참여한 모임 채팅에 공유돼 있는지 (채팅 삭제 후에는 false). */
+    // 모임(Meeting, 백승효)에 기대는 포트는 두 개이고 쓰는 곳이 다르다.
+    // - MeetingSharePort: 그림 이미지 조회 권한 (DrawingService)
+    // - MeetingReader: 모임 회고 카드 만들기 · 조회 (MeetingCardService)
+
+    /** [그림 이미지 조회 권한] 이 그림이 사용자가 참여한 모임 채팅에 공유돼 있는지 (채팅 삭제 후에는 false). */
     public interface MeetingSharePort {
         boolean isSharedWith(long drawingId, long userId);
     }
@@ -58,8 +62,10 @@ public final class Ports {
     /** 모임 참여자 한 명: 모임에서 공유한 그림(없으면 null)과 본인이 쓴 텍스트 메시지. */
     public record MeetingMember(long userId, Long drawingId, List<String> messages) {}
 
+    /** 모임이 끝났는지(전원 대화 종료)와 참여자 목록. */
     public record MeetingInfo(boolean ended, List<MeetingMember> members) {}
 
+    /** [모임 회고 카드] 모임 하나의 종료 여부 · 참여자별 공유 그림 · 본인 메시지. 없는 모임이면 empty. */
     public interface MeetingReader {
         Optional<MeetingInfo> find(long meetingId);
     }

@@ -54,7 +54,8 @@ public class ConversationController {
         return ApiResponse.ok(service.reply(currentUser.currentUserId(), conversationId, request));
     }
 
-    @Operation(summary = "대화 마치기", description = "{\"status\":\"ENDED\"}. 회고 카드(whatISaid · thoughts · todaysStory)를 만든다. "
+    @Operation(summary = "대화 마치기", description = "{\"status\":\"ENDED\"}. 회고 카드(whatISaid · thoughts · todaysStory)와 그림 자세히 살펴보기 analysis"
+            + "(mainElements · spatialComposition · lineExpression · emotionMeaning, 말하지 않은 칸은 null)를 만든다. "
             + "응답의 recordId로 회고 저장을 한다. 위기 표현이 담긴 답은 카드 재료에서 빠진다.")
     @PutMapping("/{conversationId}")
     public ApiResponse<EndResponse> end(@PathVariable long conversationId, @RequestBody EndRequest request) {
