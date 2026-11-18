@@ -34,10 +34,10 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(code.name(), code.getMessage()));
     }
 
-    /** 같은 대화에 요청이 동시에 들어와 @Version 충돌이 난 경우 (ai). */
+    /** 같은 데이터에 요청이 동시에 들어와 @Version 충돌이 난 경우 (모든 기능 공통). */
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Void>> handleConflict(OptimisticLockingFailureException e) {
-        ErrorCode code = ErrorCode.CONVERSATION_BUSY;
+        ErrorCode code = ErrorCode.CONCURRENT_REQUEST;
         return ResponseEntity.status(code.getStatus())
                 .body(ApiResponse.fail(code.name(), code.getMessage()));
     }
