@@ -6,6 +6,7 @@ import com.ganzithon.moyang.common.port.Ports.MeetingReader;
 import com.ganzithon.moyang.common.port.Ports.MeetingSharePort;
 import com.ganzithon.moyang.meeting.domain.Meeting;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingStatus;
+import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingType;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MessageType;
 import com.ganzithon.moyang.meeting.domain.MeetingMessage;
 import com.ganzithon.moyang.meeting.repository.MeetingMessageRepository;
@@ -45,7 +46,7 @@ public class MeetingPortService implements MeetingSharePort, MeetingReader {
     @Override
     public boolean isSharedWith(long drawingId, long userId) {
         return messages.countSharedWith(drawingId, userId, MessageType.DRAWING,
-                time.now().minus(Meeting.ENDED_VISIBLE)) > 0;
+                time.now().minus(Meeting.ENDED_VISIBLE), MeetingType.LIVE) > 0;
     }
 
     /** 종료는 전원 대화 종료(ENDED)일 때만 true. 참여자는 신청을 유지한 사람이고, 그림은 가장 최근에 공유한 한 장이다. */
@@ -65,7 +66,9 @@ public class MeetingPortService implements MeetingSharePort, MeetingReader {
                     texts.computeIfAbsent(m.getUserId(), k -> new ArrayList<>()).add(m.getContent());
                 }
             }
+            // 회고 카드는 실제로 방에 있던 사람에게만 만든다(예약 모임은 입장한 사람, 실시간은 신청을 유지한 사람)
             List<MeetingMember> members = participants.findByMeetingIdAndCanceledAtIsNull(meetingId).stream()
+                    .filter(p -> meeting.getType() != MeetingType.SCHEDULED || p.hasEntered())
                     .map(p -> new MeetingMember(p.getUserId(), lastDrawing.get(p.getUserId()),
                             texts.getOrDefault(p.getUserId(), List.of())))
                     .toList();

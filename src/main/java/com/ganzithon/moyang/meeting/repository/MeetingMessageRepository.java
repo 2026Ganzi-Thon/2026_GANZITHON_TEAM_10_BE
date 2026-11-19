@@ -1,5 +1,6 @@
 package com.ganzithon.moyang.meeting.repository;
 
+import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingType;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MessageType;
 import com.ganzithon.moyang.meeting.domain.MeetingMessage;
 import java.time.LocalDateTime;
@@ -25,12 +26,14 @@ public interface MeetingMessageRepository extends JpaRepository<MeetingMessage, 
 
     /**
      * 이 그림이 사용자가 참여 중인 모임 채팅에 공유돼 있는지 센다. 종료 후 24시간이 지난 방(visibleSince보다 일찍 끝난 모임)은
-     * 채팅이 삭제된 것으로 보고 세지 않는다.
+     * 채팅이 삭제된 것으로 보고 세지 않는다. 예약 모임은 입장한 사람만 본다(live는 실시간 모임 종류 값).
      */
     @Query("select count(m) from MeetingMessage m, MeetingParticipant p, Meeting mt "
             + "where m.drawingId = :drawingId and m.type = :type "
             + "and p.meetingId = m.meetingId and p.userId = :userId and p.canceledAt is null "
-            + "and mt.id = m.meetingId and (mt.endedAt is null or mt.endedAt >= :visibleSince)")
+            + "and mt.id = m.meetingId and (mt.endedAt is null or mt.endedAt >= :visibleSince) "
+            + "and (mt.type = :live or p.enteredAt is not null)")
     long countSharedWith(@Param("drawingId") long drawingId, @Param("userId") long userId,
-                         @Param("type") MessageType type, @Param("visibleSince") LocalDateTime visibleSince);
+                         @Param("type") MessageType type, @Param("visibleSince") LocalDateTime visibleSince,
+                         @Param("live") MeetingType live);
 }

@@ -406,6 +406,9 @@ class MeetingChatApiTest {
                 .andExpect(jsonPath("$.data.endAt").isString());
 
         jdbc.update("update meetings set status = 'IN_PROGRESS', phase = 'INTRO' where id = ?", id);
+        // 예약 모임이 시작된 뒤에는 입장한 사람만 채팅을 읽고 보낼 수 있다
+        jdbc.update("update meeting_participants set entered_at = ? where meeting_id = ?",
+                java.sql.Timestamp.valueOf(LocalDateTime.now(KST)), id);
         poll(guest, id).andExpect(jsonPath("$.data.status").value("IN_PROGRESS"))
                 .andExpect(jsonPath("$.data.topic").isString());
         sendText(guest, id, "예약 모임 채팅").andExpect(status().isOk());

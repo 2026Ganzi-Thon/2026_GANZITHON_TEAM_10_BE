@@ -27,13 +27,15 @@ public class MeetingPhaseService {
     private final MeetingParticipantRepository participants;
     private final MeetingMessageRepository messages;
     private final MeetingQueryService time;
+    private final MeetingRoster roster;
 
     public MeetingPhaseService(MeetingRepository meetings, MeetingParticipantRepository participants,
-                               MeetingMessageRepository messages, MeetingQueryService time) {
+                               MeetingMessageRepository messages, MeetingQueryService time, MeetingRoster roster) {
         this.meetings = meetings;
         this.participants = participants;
         this.messages = messages;
         this.time = time;
+        this.roster = roster;
     }
 
     /** 방장(또는 예약 모임에서 방장이 없을 때 첫 입장자)이 다음 단계로 넘긴다(주제 건너뛰기 버튼). */
@@ -42,8 +44,12 @@ public class MeetingPhaseService {
         LocalDateTime now = time.now();
         Meeting meeting = meetings.findForUpdate(meetingId).filter(m -> !m.expired(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
-        participants.findByMeetingIdAndUserId(meetingId, userId).filter(MeetingParticipant::isActive)
+        MeetingParticipant mine = participants.findByMeetingIdAndUserId(meetingId, userId)
+                .filter(MeetingParticipant::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_PARTICIPANT));
+        if (!roster.hasRoomAccess(meeting, mine)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+        }
         if (meeting.getStatus() != MeetingStatus.IN_PROGRESS) {
             throw new BusinessException(ErrorCode.MEETING_NOT_IN_PROGRESS);
         }

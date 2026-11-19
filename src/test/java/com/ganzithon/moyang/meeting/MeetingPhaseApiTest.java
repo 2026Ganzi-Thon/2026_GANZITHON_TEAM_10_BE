@@ -297,7 +297,7 @@ class MeetingPhaseApiTest {
         moveStartAtToPast(id);
         lifecycle.processDue(now());
 
-        expectError(next(host, id), 403, "NO_SKIP_PERMISSION"); // 방장은 입장하지 않았으니 권한 없음
+        expectError(next(host, id), 403, "NOT_PARTICIPANT"); // 방장은 입장하지 않아 방 안에 없으니 접근 자체가 안 된다
         expectError(next(b, id), 403, "NO_SKIP_PERMISSION");
         next(a, id).andExpect(status().isOk()).andExpect(jsonPath("$.data.phase").value("DRAWING"));
     }

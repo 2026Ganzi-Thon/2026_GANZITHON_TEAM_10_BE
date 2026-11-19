@@ -38,16 +38,18 @@ public class MeetingChatService {
     private final DrawingRepository drawings;
     private final MeetingQueryService time;
     private final MeetingPhaseService phases;
+    private final MeetingRoster roster;
 
     public MeetingChatService(MeetingRepository meetings, MeetingParticipantRepository participants,
                               MeetingMessageRepository messages, DrawingRepository drawings,
-                              MeetingQueryService time, MeetingPhaseService phases) {
+                              MeetingQueryService time, MeetingPhaseService phases, MeetingRoster roster) {
         this.meetings = meetings;
         this.participants = participants;
         this.messages = messages;
         this.drawings = drawings;
         this.time = time;
         this.phases = phases;
+        this.roster = roster;
     }
 
     /**
@@ -72,9 +74,13 @@ public class MeetingChatService {
         LocalDateTime now = time.now();
         Meeting meeting = meetings.findForUpdate(meetingId).filter(m -> !m.expired(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
-        requireActiveParticipant(meetingId, userId);
+        MeetingParticipant sender = requireActiveParticipant(meetingId, userId);
         if (meeting.getStatus() != MeetingStatus.IN_PROGRESS) {
             throw new BusinessException(ErrorCode.MEETING_NOT_IN_PROGRESS);
+        }
+        // 예약 모임은 실제로 입장한 사람만 방에서 말할 수 있다(신청만 하고 오지 않은 사람 제외)
+        if (!roster.hasRoomAccess(meeting, sender)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
         }
 
         if (type == MessageType.DRAWING && meeting.getPhase() == MeetingPhase.INTRO) {
@@ -95,7 +101,7 @@ public class MeetingChatService {
         MeetingMessage saved = messages.saveAndFlush(message);
         // 그림 단계에서 참여자 모두가 그림을 올렸으면 서버가 자동으로 그림 이야기(SHARING) 단계로 넘긴다
         if (type == MessageType.DRAWING && meeting.getPhase() == MeetingPhase.DRAWING
-                && messages.countDrawingSubmitters(meetingId) >= participants.countActiveByMeetingId(meetingId)) {
+                && messages.countDrawingSubmitters(meetingId) >= roster.countInRoom(meeting)) {
             phases.advance(meeting, now);
         }
         return new SendMessageResponse(saved.getId(), MeetingQueryService.toOffset(saved.getCreatedAt()));
@@ -111,6 +117,10 @@ public class MeetingChatService {
         Meeting meeting = meetings.findById(meetingId).filter(m -> !m.expired(now))
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
         MeetingParticipant me = requireActiveParticipant(meetingId, userId);
+        // 예약 모임이 시작된 뒤에는 입장한 사람만 채팅을 읽을 수 있다. 시작 전·취소된 모임은 상태를 알아야 해서 그대로 연다.
+        if (!roster.hasRoomAccess(meeting, me)) {
+            throw new BusinessException(ErrorCode.NOT_PARTICIPANT);
+        }
 
         List<MeetingMessage> rows = afterId == null
                 ? messages.findByMeetingIdOrderByIdAsc(meetingId)
@@ -130,7 +140,7 @@ public class MeetingChatService {
                 meeting.getPhase() == null ? null : meeting.getPhase().name(),
                 meeting.getPhase() == null ? null : meeting.getPhase().ordinal() + 1,
                 topicVisible ? meeting.getTopicTitle() : null,
-                (int) messages.countDrawingSubmitters(meetingId), active.size(),
+                (int) messages.countDrawingSubmitters(meetingId), (int) roster.countInRoom(meeting),
                 (int) active.stream().filter(MeetingParticipant::hasAgreedEnd).count(), me.hasAgreedEnd(),
                 scheduled ? MeetingQueryService.toOffset(meeting.getStartAt().plus(Meeting.SCHEDULED_LENGTH)) : null,
                 status == MeetingStatus.ENDED && meeting.getEndedAt() != null

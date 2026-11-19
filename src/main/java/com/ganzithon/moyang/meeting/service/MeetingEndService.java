@@ -31,16 +31,18 @@ public class MeetingEndService {
     private final MeetingQueryService time;
     private final MeetingCardTrigger cardTrigger;
     private final TransactionTemplate transaction;
+    private final MeetingRoster roster;
 
     public MeetingEndService(MeetingRepository meetings, MeetingParticipantRepository participants,
                              MeetingMessageRepository messages, MeetingQueryService time,
-                             MeetingCardTrigger cardTrigger, PlatformTransactionManager tm) {
+                             MeetingCardTrigger cardTrigger, PlatformTransactionManager tm, MeetingRoster roster) {
         this.meetings = meetings;
         this.participants = participants;
         this.messages = messages;
         this.time = time;
         this.cardTrigger = cardTrigger;
         this.transaction = new TransactionTemplate(tm);
+        this.roster = roster;
     }
 
     private record Outcome(EndMeetingResponse response, boolean justEnded) {}
@@ -64,6 +66,10 @@ public class MeetingEndService {
         MeetingParticipant mine = participants.findByMeetingIdAndUserId(meetingId, userId)
                 .filter(MeetingParticipant::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_JOINED));
+        // 예약 모임은 실제로 입장한 사람만 종료에 동의할 수 있다(신청만 하고 오지 않은 사람은 집계에서도 빠진다)
+        if (!roster.hasRoomAccess(meeting, mine)) {
+            throw new BusinessException(ErrorCode.NOT_JOINED);
+        }
         if (meeting.getStatus() == MeetingStatus.ENDED && mine.hasAgreedEnd()) {
             return new Outcome(response(meeting), false);
         }
@@ -73,7 +79,7 @@ public class MeetingEndService {
         mine.agreeEnd(now);
         participants.saveAndFlush(mine);
 
-        long total = participants.countActiveByMeetingId(meetingId);
+        long total = roster.countInRoom(meeting);
         long agreed = participants.countByMeetingIdAndCanceledAtIsNullAndEndAgreedAtIsNotNull(meetingId);
         boolean everyoneAgreed = agreed >= total;
         if (everyoneAgreed) {
@@ -88,6 +94,6 @@ public class MeetingEndService {
         long id = meeting.getId();
         return new EndMeetingResponse(id,
                 (int) participants.countByMeetingIdAndCanceledAtIsNullAndEndAgreedAtIsNotNull(id),
-                (int) participants.countActiveByMeetingId(id), meeting.getStatus().name());
+                (int) roster.countInRoom(meeting), meeting.getStatus().name());
     }
 }
