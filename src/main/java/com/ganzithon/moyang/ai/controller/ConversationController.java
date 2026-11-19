@@ -48,7 +48,9 @@ public class ConversationController {
     @Operation(summary = "답하고 다음 질문 받기", description = "type: ANSWER(content 필수, 1000자) · DONT_KNOW · SKIP. "
             + "기본 질문을 다 쓰면 question=null, isLastQuestion=true, canExtend로 연장 여부를 알려준다. "
             + "연장은 {\"useWool\":true}만 보내거나 답과 함께 보낸다 (양털 1개, 최대 10번째 질문까지). "
-            + "위기 표현이면 question=null, supportNotice(109 상담 안내)가 오고 양털은 차감하지 않는다.")
+            + "위기 표현이면 question=null, supportNotice(109 상담 안내)가 오고 양털은 차감하지 않는다. "
+            + "남은 무료 질문이 0일 때 안내가 오면 답만 다시 보내도 400이니 마치기를 안내한다. "
+            + "연타 · 재시도로 앞 요청이 먼저 처리됐으면 409 CONCURRENT_REQUEST (앞 요청은 정상 처리됨, 무시하면 된다).")
     @PostMapping("/{conversationId}/messages")
     public ApiResponse<ReplyResponse> reply(@PathVariable long conversationId, @RequestBody MessageRequest request) {
         return ApiResponse.ok(service.reply(currentUser.currentUserId(), conversationId, request));
@@ -56,7 +58,9 @@ public class ConversationController {
 
     @Operation(summary = "대화 마치기", description = "{\"status\":\"ENDED\"}. 회고 카드(whatISaid · thoughts · todaysStory)와 그림 자세히 살펴보기 analysis"
             + "(mainElements · spatialComposition · lineExpression · emotionMeaning, 말하지 않은 칸은 null)를 만든다. "
-            + "응답의 recordId로 회고 저장을 한다. 위기 표현이 담긴 답은 카드 재료에서 빠진다.")
+            + "응답의 recordId로 회고 저장을 한다. 위기 표현이 담긴 답은 카드 재료에서 빠진다. "
+            + "마치는 사이 새 답이 저장되면 그 답까지 넣어 카드를 다시 만든다 (그만큼 늦어질 수 있다). "
+            + "이미 끝난 대화면 409 CONVERSATION_ALREADY_ENDED: 재시도 · 이중 탭이면 대화 상세 조회로 카드를 보여 준다.")
     @PutMapping("/{conversationId}")
     public ApiResponse<EndResponse> end(@PathVariable long conversationId, @RequestBody EndRequest request) {
         return ApiResponse.ok(service.end(currentUser.currentUserId(), conversationId, request.status()));

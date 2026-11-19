@@ -40,7 +40,11 @@ import com.ganzithon.moyang.common.port.Ports.UserContextProvider;
 import com.ganzithon.moyang.common.port.Ports.WoolPort;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,8 +54,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class ConversationService {
+    private static final Logger log = LoggerFactory.getLogger(ConversationService.class);
     private static final int MAX_CONTENT = 1000;
     private static final int EXTEND_COST = 1;
+    private static final int END_ATTEMPTS = 2;
 
     private final ConversationRepository conversations;
     private final ConversationMessageRepository messages;
@@ -155,44 +161,49 @@ public class ConversationService {
 
         ConversationMessage userMessage = type == null ? null
                 : ConversationMessage.user(c.getId(), type, content, c.getQuestionCount(), crisis);
-        if (crisis) {
-            messages.save(userMessage);
-            return noQuestion(c, SupportNotice.DEFAULT);
-        }
-        if (!free && !useWool) {
-            messages.save(userMessage);
-            return noQuestion(c, null);
-        }
         if (userMessage != null) {
             history.add(userMessage);
         }
 
+        // 위기 키워드면 AI 없이 바로 안내한다
+        boolean askNext = !crisis && (free || useWool);
         int asked = c.getQuestionCount();
         int order = asked + 1;
-        Drawing drawing = drawingOf(c);
-        Question q = ai.nextQuestion(context(drawing), lines(history, false), order);
-        // AI 2차 감지: 질문을 내보내지 않고 안내만 한다. 양털도 차감하지 않는다
-        boolean support = q.needsSupport() && type == Type.ANSWER;
-        if (support) {
+        // 다음 질문이 없는 마지막 답도 AI 2차 감지를 거친다 (이때 AI가 만든 질문은 버린다). AI 실패면 키워드 판정만
+        Question q = askNext || (!crisis && type == Type.ANSWER)
+                ? ai.nextQuestion(context(drawingOf(c)), lines(history, false), order) : null;
+        if (q != null && q.fallback() && type == Type.ANSWER) {
+            // AI 2차 감지를 못 해 키워드 판정만 적용됨. 위기 기능 저하를 알 수 있게 남긴다 (대화 내용은 남기지 않는다)
+            log.warn("crisis AI check unavailable, keyword only: conversationId={}, question={}", c.getId(), asked);
+        }
+        // AI 2차 감지: 질문을 내보내지 않고 안내만 한다. 양털도 차감하지 않는다 (키워드 위기는 만들 때 이미 표시됨)
+        boolean aiSupport = q != null && q.needsSupport() && type == Type.ANSWER;
+        if (aiSupport) {
             userMessage.markNeedsSupport();
         }
+        boolean support = crisis || aiSupport;
 
         boolean paid = !free;
-        // 답과 다음 질문은 한 트랜잭션으로 저장한다 (실패하면 답만 남는 일이 없게)
+        // 모든 저장은 한 트랜잭션에서 한다 (실패하면 답만 남는 일이 없게, 연타로 같은 답이 두 번 저장되지 않게)
         return tx.execute(status -> {
             Conversation fresh = conversations.findById(c.getId()).orElseThrow();
             if (fresh.isEnded()) {
                 throw new BusinessException(ErrorCode.CONVERSATION_ALREADY_ENDED);
             }
-            if (fresh.getQuestionCount() != asked) {
-                // AI를 기다리는 사이 같은 대화의 다른 요청(연타 · 재시도)이 먼저 처리됨
+            // 이 요청이 대화를 읽은 뒤 다른 요청(연타 · 재시도)이 먼저 저장했으면 409. 모든 저장이 version을 올리므로
+            // (touch · asked · end) 질문 수 · 마지막 메시지 중 무엇이 어긋나도 여기서 잡힌다
+            if (fresh.getVersion() != c.getVersion()) {
                 throw new BusinessException(ErrorCode.CONCURRENT_REQUEST);
             }
+            fresh.touch(); // 지금 동시에 겹친 다른 저장과는 커밋 때 @Version 충돌 → 409
             if (userMessage != null) {
                 messages.save(userMessage);
             }
             if (support) {
                 return noQuestion(fresh, SupportNotice.DEFAULT);
+            }
+            if (!askNext) {
+                return noQuestion(fresh, null);
             }
             fresh.asked(paid);
             if (paid) {
@@ -217,22 +228,50 @@ public class ConversationService {
         }
         Drawing drawing = drawingOf(c);
         Context ctx = context(drawing);
-        Card card = ai.card(ctx, lines(messages.findByConversationIdOrderByIdAsc(c.getId()), true));
-
-        return tx.execute(s -> {
-            Conversation fresh = conversations.findById(c.getId()).orElseThrow();
-            if (fresh.isEnded()) {
+        // 카드를 만드는 사이(최대 30초) 답이 저장되면 그 답이 빠진 카드가 된다 → 그 답까지 넣어 카드를 다시 만든다
+        for (int attempt = 1; ; attempt++) {
+            List<ConversationMessage> history = messages.findByConversationIdOrderByIdAsc(c.getId());
+            Long lastSeenId = lastId(history);
+            Card card = ai.card(ctx, lines(history, true));
+            String retryReason;
+            try {
+                EndResponse ended = tx.execute(s -> {
+                    Conversation fresh = conversations.findById(c.getId()).orElseThrow();
+                    if (fresh.isEnded()) {
+                        throw new BusinessException(ErrorCode.CONVERSATION_ALREADY_ENDED);
+                    }
+                    if (hasNewMessage(fresh.getId(), lastSeenId)) {
+                        return null;
+                    }
+                    fresh.end(card.whatISaid(), card.thoughts(), card.todaysStory(), card.fallback());
+                    if (card.analysis() != null) {
+                        var a = card.analysis();
+                        fresh.analyzed(a.mainElements(), a.spatialComposition(), a.lineExpression(),
+                                a.emotionMeaning());
+                    }
+                    records.cardReady(fresh.getRecordId());
+                    return new EndResponse(fresh.getId(), fresh.getRecordId(), fresh.getStatus().name(),
+                            drawingView(drawing, ctx), cardView(fresh), analysisView(fresh), fresh.isCardFallback());
+                });
+                if (ended != null) {
+                    return ended;
+                }
+                retryReason = "new-message";
+            } catch (OptimisticLockingFailureException e) {
+                // 답 저장 · 다른 마치기와 같은 순간에 겹침: 다음 시도에서 다시 읽는다
+                retryReason = "optimistic-lock";
+            }
+            // 늦게 온 답 하나는 두 번째 시도에 담긴다. 마치는 동안 계속 답이 들어올 때만 409
+            if (attempt == END_ATTEMPTS) {
+                log.warn("end gave up: conversationId={}, attempts={}, reason={}", c.getId(), attempt, retryReason);
+                throw new BusinessException(ErrorCode.CONCURRENT_REQUEST);
+            }
+            log.info("end retry: conversationId={}, attempt={}, reason={}", c.getId(), attempt, retryReason);
+            // 이중 탭으로 다른 마치기가 먼저 끝냈으면 카드를 또 만들지 않는다
+            if (conversations.findById(c.getId()).map(Conversation::isEnded).orElse(false)) {
                 throw new BusinessException(ErrorCode.CONVERSATION_ALREADY_ENDED);
             }
-            fresh.end(card.whatISaid(), card.thoughts(), card.todaysStory(), card.fallback());
-            if (card.analysis() != null) {
-                var a = card.analysis();
-                fresh.analyzed(a.mainElements(), a.spatialComposition(), a.lineExpression(), a.emotionMeaning());
-            }
-            records.cardReady(fresh.getRecordId());
-            return new EndResponse(fresh.getId(), fresh.getRecordId(), fresh.getStatus().name(), drawingView(drawing, ctx),
-                    cardView(fresh), analysisView(fresh), fresh.isCardFallback());
-        });
+        }
     }
 
     public DetailResponse detail(long userId, long conversationId) {
@@ -303,6 +342,17 @@ public class ConversationService {
     private Drawing drawingOf(Conversation c) {
         return drawings.findByRecordId(c.getRecordId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.DRAWING_NOT_FOUND));
+    }
+
+    private static Long lastId(List<ConversationMessage> history) {
+        return history.isEmpty() ? null : history.get(history.size() - 1).getId();
+    }
+
+    /** 요청을 시작할 때 본 마지막 메시지 뒤로 새 메시지가 있는지 = AI를 기다리는 사이 다른 요청(연타 · 재시도)이 먼저 저장했는지. */
+    private boolean hasNewMessage(long conversationId, Long lastSeenId) {
+        Long now = messages.findFirstByConversationIdOrderByIdDesc(conversationId)
+                .map(ConversationMessage::getId).orElse(null);
+        return !Objects.equals(now, lastSeenId);
     }
 
     private static Type parseType(String raw) {
