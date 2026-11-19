@@ -1,6 +1,7 @@
 package com.ganzithon.moyang.meeting.domain;
 
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.CancelReason;
+import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingPhase;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingStatus;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingType;
 import jakarta.persistence.Column;
@@ -23,6 +24,8 @@ public class Meeting {
     public static final Duration ENTER_OPEN_BEFORE = Duration.ofMinutes(5);
     /** 참여자 취소 환불 마감 (시작 10분 전). */
     public static final Duration REFUND_DEADLINE_BEFORE = Duration.ofMinutes(10);
+    /** 예약 모임 시작 시각에 입장자가 모자랄 때 기다려 주는 시간. 시작 시각 + 2분이 넘으면 자동 취소한다. */
+    public static final Duration START_WAIT = Duration.ofMinutes(2);
     /** 예약 모임 진행 시간(표시용). */
     public static final Duration SCHEDULED_LENGTH = Duration.ofMinutes(40);
     /** 종료된 모임 상세를 보여 주는 기간. */
@@ -71,6 +74,13 @@ public class Meeting {
     private LocalDateTime createdAt;
 
     private LocalDateTime endedAt;
+
+    /** 시작한 뒤의 진행 단계. 시작 전에는 null. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private MeetingPhase phase;
+
+    private LocalDateTime startedAt;
 
     protected Meeting() {}
 
@@ -122,6 +132,16 @@ public class Meeting {
         if (status == MeetingStatus.ENDED || status == MeetingStatus.CANCELED) {
             this.endedAt = now;
         }
+    }
+
+    public MeetingPhase getPhase() { return phase; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+
+    /** 모임을 시작한다. 진행 중(IN_PROGRESS) 상태와 첫 단계(INTRO)로 바꾼다. */
+    public void start(LocalDateTime now) {
+        this.status = MeetingStatus.IN_PROGRESS;
+        this.phase = MeetingPhase.INTRO;
+        this.startedAt = now;
     }
 
     public void cancel(CancelReason reason, LocalDateTime now) {

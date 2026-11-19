@@ -18,5 +18,11 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
     @Query("select m from Meeting m where m.id = :id")
     Optional<Meeting> findForUpdate(@Param("id") Long id);
 
+    /** 시작 시각이 지났는데 아직 시작·취소 처리되지 않은 예약 모임의 번호(스케줄러용). */
+    @Query("select m.id from Meeting m where m.type = :type and m.status = :status and m.startAt <= :now "
+            + "order by m.startAt, m.id")
+    List<Long> findDueIds(@Param("type") MeetingType type, @Param("status") MeetingStatus status,
+                          @Param("now") java.time.LocalDateTime now);
+
     List<Meeting> findByTypeAndStatusIn(MeetingType type, Collection<MeetingStatus> statuses);
 }

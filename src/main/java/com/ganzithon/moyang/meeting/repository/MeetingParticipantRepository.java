@@ -24,6 +24,12 @@ public interface MeetingParticipantRepository extends JpaRepository<MeetingParti
 
     List<MeetingParticipant> findByMeetingIdAndCanceledAtIsNull(long meetingId);
 
+    /** 참여 중이면서 입장한 사람, 먼저 입장한 순서대로(주제 건너뛰기 권한자 판단용). */
+    List<MeetingParticipant> findByMeetingIdAndCanceledAtIsNullAndEnteredAtIsNotNullOrderByEnteredAtAscIdAsc(
+            long meetingId);
+
+    long countByMeetingIdAndCanceledAtIsNullAndEnteredAtIsNotNull(long meetingId);
+
     List<MeetingParticipant> findByUserIdAndCanceledAtIsNull(long userId);
 
     List<MeetingParticipant> findByMeetingIdInAndUserIdAndCanceledAtIsNull(Collection<Long> meetingIds, long userId);

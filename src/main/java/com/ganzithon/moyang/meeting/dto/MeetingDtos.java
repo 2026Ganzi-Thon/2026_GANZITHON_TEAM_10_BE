@@ -47,5 +47,12 @@ public final class MeetingDtos {
                                         String myMeetingNickname, List<String> steps, List<String> recommendedFor,
                                         long hostUserId, boolean isHost, boolean canStart, boolean canSkip,
                                         OffsetDateTime enterOpenAt, OffsetDateTime cancelRefundUntil,
-                                        String cancelReason) {}
+                                        String cancelReason, String phase) {}
+
+    /** 실시간 모임 시작 결과. 시작하면 status=IN_PROGRESS, phase=INTRO. */
+    public record StartMeetingResponse(long meetingId, String status, String phase, int participantCount) {}
+
+    /** 예약 모임 입장 결과. enteredCount는 지금까지 입장한 사람 수, 2명이 모여 시작됐다면 status=IN_PROGRESS. */
+    public record EnterMeetingResponse(long meetingId, String status, String phase, int enteredCount,
+                                       OffsetDateTime startAt) {}
 }

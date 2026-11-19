@@ -15,6 +15,11 @@ public final class MeetingEnums {
         RECRUITING, OPEN, IN_PROGRESS, ENDED, CANCELED
     }
 
+    /** 진행 단계. INTRO(자기소개) → DRAWING(주제·그림) → SHARING(그림 이야기) → CLOSING(마무리). 시작하면 INTRO. */
+    public enum MeetingPhase {
+        INTRO, DRAWING, SHARING, CLOSING
+    }
+
     public enum CancelReason {
         HOST_CANCELED, NOT_ENOUGH_PARTICIPANTS
     }
