@@ -11,6 +11,8 @@ import com.ganzithon.moyang.user.dto.OnboardingDtos.OnboardingResponse;
 import com.ganzithon.moyang.user.repository.UserOnboardingRepository;
 import com.ganzithon.moyang.user.repository.UserRepository;
 import java.time.Year;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
@@ -32,10 +34,12 @@ public class OnboardingService {
 
     private final UserRepository users;
     private final UserOnboardingRepository onboardings;
+    private final Clock clock;
 
-    public OnboardingService(UserRepository users, UserOnboardingRepository onboardings) {
+    public OnboardingService(UserRepository users, UserOnboardingRepository onboardings, Clock clock) {
         this.users = users;
         this.onboardings = onboardings;
+        this.clock = clock;
     }
 
     @Transactional
@@ -50,7 +54,7 @@ public class OnboardingService {
                 n.themeDirect ? n.themeText : null,
                 n.lifeStatus, n.lifeEtc ? n.lifeStatusText : null,
                 n.emotions, n.emotionDirect ? n.emotionText : null,
-                n.extraStory);
+                n.extraStory, LocalDateTime.ofInstant(clock.instant(), ZoneId.of("Asia/Seoul")));
         onboardings.save(onboarding);
         user.completeOnboarding(n.themeCode);
         return new OnboardingResponse(true, OnboardingData.from(onboarding));
