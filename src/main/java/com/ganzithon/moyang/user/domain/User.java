@@ -34,6 +34,10 @@ public class User {
     @Column(length = 30)
     private String themeCode;
 
+    /** 양 프로필 색상 코드(예: PINK). 고르기 전에는 null. 바꾸는 API는 양 색상 단위에서 만든다. */
+    @Column(length = 20)
+    private String sheepColor;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -54,8 +58,21 @@ public class User {
     public boolean isOnboardingCompleted() { return onboardingCompleted; }
 
     public String getThemeCode() { return themeCode; }
+    public String getSheepColor() { return sheepColor; }
 
     public void changeThemeCode(String themeCode) { this.themeCode = themeCode; }
+
+    /** 닉네임을 바꾼다. 앞뒤 공백 제거와 글자 수 검증은 서비스에서 끝낸 뒤 부른다. */
+    public void changeNickname(String nickname) { this.nickname = nickname; }
+
+    /** 양 프로필 색상을 바꾼다. 값 형식 검증은 서비스에서 끝낸 뒤 부른다. */
+    public void changeSheepColor(String sheepColor) { this.sheepColor = sheepColor; }
+
+    /** 온보딩을 저장했을 때 부른다. 고민 코드를 채우고 완료 표시를 한다(추천 주제가 이 값을 쓴다). */
+    public void completeOnboarding(String themeCode) {
+        this.onboardingCompleted = true;
+        this.themeCode = themeCode;
+    }
 
     public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 }
