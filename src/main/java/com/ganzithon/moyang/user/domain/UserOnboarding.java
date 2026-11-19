@@ -54,6 +54,12 @@ public class UserOnboarding {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * 지금 고민(themeCode)을 고른 시각(서울 시간). 처음 저장할 때와 고민 코드가 바뀔 때만 갱신한다.
+     * 나의 모양의 완료 회차는 이 시각 이후에 저장된 기록만 센다. 기록의 completedAt과 같은 서울 시간 기준이다.
+     */
+    private LocalDateTime themeSelectedAt;
+
     protected UserOnboarding() {}
 
     public UserOnboarding(Long userId) {
@@ -63,7 +69,10 @@ public class UserOnboarding {
     /** 보낸 값으로 모든 칸을 덮어쓴다. 값 검증은 서비스에서 끝낸 뒤 부른다. */
     public void overwrite(Integer birthYear, String gender, String artExperience, String themeCode,
                           String themeText, String lifeStatus, String lifeStatusText,
-                          List<String> emotions, String emotionText, String extraStory) {
+                          List<String> emotions, String emotionText, String extraStory, LocalDateTime now) {
+        if (this.themeCode == null || !this.themeCode.equals(themeCode)) {
+            this.themeSelectedAt = now;
+        }
         this.birthYear = birthYear;
         this.gender = gender;
         this.artExperience = artExperience;
@@ -74,7 +83,7 @@ public class UserOnboarding {
         this.emotions = emotions.isEmpty() ? null : String.join(SEPARATOR, emotions);
         this.emotionText = emotionText;
         this.extraStory = extraStory;
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = now;
     }
 
     public Long getUserId() { return userId; }
@@ -82,6 +91,9 @@ public class UserOnboarding {
     public String getGender() { return gender; }
     public String getArtExperience() { return artExperience; }
     public String getThemeCode() { return themeCode; }
+
+    /** 고민을 고른 시각. 이 값이 생기기 전에 저장된 옛 데이터는 마지막 저장 시각으로 대신한다. */
+    public LocalDateTime getThemeSelectedAt() { return themeSelectedAt != null ? themeSelectedAt : updatedAt; }
     public String getThemeText() { return themeText; }
     public String getLifeStatus() { return lifeStatus; }
     public String getLifeStatusText() { return lifeStatusText; }
