@@ -23,6 +23,14 @@ public final class MeetingDtos {
     public record JoinMeetingResponse(long meetingId, int participantCount, int capacity, String status,
                                       String meetingNickname, int sheepUsed, int sheepBalance) {}
 
+    /** 신청 취소 결과. refunded가 true면 양털 1개가 돌아왔다. */
+    public record LeaveMeetingResponse(long meetingId, int participantCount, boolean refunded, int sheepRefunded,
+                                       int sheepBalance) {}
+
+    /** 방장 취소 결과. refundedParticipantCount는 환불받은 참여자 수, hostRefunded는 방장 생성비 환불 여부. */
+    public record CancelMeetingResponse(long meetingId, String status, int refundedParticipantCount,
+                                        boolean hostRefunded, int sheepBalance) {}
+
     public record MeetingListResponse(Long recommendedMeetingId, List<MeetingSummary> meetings) {}
 
     /** 내 모임 한 칸. 목록 칸에 내가 방장인지와 모임 닉네임이 더해진다. */
