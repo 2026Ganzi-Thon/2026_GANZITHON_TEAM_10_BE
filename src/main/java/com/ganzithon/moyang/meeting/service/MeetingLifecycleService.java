@@ -14,7 +14,10 @@ import com.ganzithon.moyang.meeting.repository.MeetingRepository;
 import com.ganzithon.moyang.sheep.service.SheepService;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -159,16 +162,35 @@ public class MeetingLifecycleService {
         }
     }
 
-    /** 입장자가 모자라 자동 취소: 신청을 유지한 참여자와 방장 모두에게 양털을 전액 환불한다. */
-    private void cancelForLackOfParticipants(Meeting meeting, LocalDateTime now) {
+    /**
+     * 기다려 주는 시간(시작 시각 + 2분)이 지났는데 입장자가 2명 미만인 예약 모임이면, 스케줄러를 기다리지 않고 지금 자동 취소한다.
+     * 이 모임에서 취소·신청 취소가 들어와도 자동 취소와 같은 규칙(전원 전액 환불)으로 처리하려고 쓴다.
+     * 모임 행 락을 잡은 트랜잭션 안에서 부른다. 해당 없으면 empty, 취소했으면 환불을 받은 사용자 id를 돌려준다.
+     */
+    Optional<Set<Long>> cancelIfWaitExpired(Meeting meeting, LocalDateTime now) {
+        if (meeting.getType() != MeetingType.SCHEDULED || meeting.getStatus() != MeetingStatus.RECRUITING
+                || now.isBefore(meeting.getStartAt()) || !waitExpired(meeting, now)
+                || participants.countByMeetingIdAndCanceledAtIsNullAndEnteredAtIsNotNull(meeting.getId())
+                        >= MIN_TO_START) {
+            return Optional.empty();
+        }
+        return Optional.of(cancelForLackOfParticipants(meeting, now));
+    }
+
+    /** 입장자가 모자라 자동 취소: 신청을 유지한 참여자와 방장 모두에게 양털을 전액 환불한다. 환불받은 사용자 id를 돌려준다. */
+    private Set<Long> cancelForLackOfParticipants(Meeting meeting, LocalDateTime now) {
         List<MeetingParticipant> everyone = participants.findByMeetingIdAndCanceledAtIsNull(meeting.getId()).stream()
                 .sorted(Comparator.comparingLong(MeetingParticipant::getUserId)) // 지갑 락 순서를 고정해 교착 방지
                 .toList();
+        Set<Long> refunded = new HashSet<>();
         for (MeetingParticipant p : everyone) {
-            sheep.refundMeeting(p.getUserId(), meeting.getId());
+            if (sheep.refundMeeting(p.getUserId(), meeting.getId()).applied()) {
+                refunded.add(p.getUserId());
+            }
         }
         meeting.cancel(CancelReason.NOT_ENOUGH_PARTICIPANTS, now);
         meetings.saveAndFlush(meeting);
+        return refunded;
     }
 
     private static boolean waitExpired(Meeting meeting, LocalDateTime now) {

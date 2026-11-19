@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,10 +50,12 @@ public class MeetingCommandService {
     private final TopicRepository topics;
     private final SheepService sheep;
     private final MeetingQueryService time;
+    private final MeetingLifecycleService lifecycle;
 
     public MeetingCommandService(MeetingRepository meetings, MeetingParticipantRepository participants,
                                  UserRepository users, TopicRepository topics, SheepService sheep,
-                                 MeetingQueryService time) {
+                                 MeetingQueryService time, MeetingLifecycleService lifecycle) {
+        this.lifecycle = lifecycle;
         this.meetings = meetings;
         this.participants = participants;
         this.users = users;
@@ -134,6 +137,13 @@ public class MeetingCommandService {
             throw new BusinessException(ErrorCode.HOST_CANNOT_LEAVE);
         }
         LocalDateTime now = time.now();
+        // 기다려 주는 시간이 지나 곧 자동 취소될 예약 모임이면, 그 규칙(전원 전액 환불)으로 지금 처리한다
+        Optional<Set<Long>> autoCanceled = lifecycle.cancelIfWaitExpired(meeting, now);
+        if (autoCanceled.isPresent()) {
+            boolean back = autoCanceled.get().contains(userId);
+            return new LeaveMeetingResponse(meetingId, (int) participants.countActiveByMeetingId(meetingId),
+                    back, back ? 1 : 0, sheep.balance(userId).balance());
+        }
         requireCancelable(meeting, now);
 
         boolean refund = guestRefundable(meeting, now);
@@ -158,6 +168,14 @@ public class MeetingCommandService {
             throw new BusinessException(ErrorCode.NOT_HOST);
         }
         LocalDateTime now = time.now();
+        // 기다려 주는 시간이 지나 곧 자동 취소될 예약 모임이면, 그 규칙(방장 포함 전원 전액 환불)으로 지금 처리한다
+        Optional<Set<Long>> autoCanceled = lifecycle.cancelIfWaitExpired(meeting, now);
+        if (autoCanceled.isPresent()) {
+            Set<Long> refundedUsers = autoCanceled.get();
+            int guestsRefunded = (int) refundedUsers.stream().filter(id -> id != userId).count();
+            return new CancelMeetingResponse(meetingId, meeting.getStatus().name(), guestsRefunded,
+                    refundedUsers.contains(userId), sheep.balance(userId).balance());
+        }
         requireCancelable(meeting, now);
 
         int refundedParticipantCount = 0;
