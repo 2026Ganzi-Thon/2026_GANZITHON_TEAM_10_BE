@@ -17,14 +17,23 @@ public class MeetingScheduler {
 
     private final MeetingLifecycleService lifecycle;
     private final MeetingQueryService time;
+    private final MeetingPurgeService purge;
 
-    public MeetingScheduler(MeetingLifecycleService lifecycle, MeetingQueryService time) {
+    public MeetingScheduler(MeetingLifecycleService lifecycle, MeetingQueryService time, MeetingPurgeService purge) {
         this.lifecycle = lifecycle;
         this.time = time;
+        this.purge = purge;
     }
 
     @Scheduled(fixedDelayString = "${moyang.meeting.scheduler.interval-ms:10000}")
     public void runOnce() {
         lifecycle.processDue(time.now());
+    }
+
+    /** 종료 후 24시간이 지난 모임의 채팅을 지운다. 급하지 않아서 10분마다 돈다(서버를 켠 1분 뒤에 첫 실행). */
+    @Scheduled(initialDelayString = "${moyang.meeting.purge.initial-delay-ms:60000}",
+            fixedDelayString = "${moyang.meeting.purge.interval-ms:600000}")
+    public void purgeOnce() {
+        purge.purgeExpired(time.now());
     }
 }

@@ -54,6 +54,10 @@ public enum ErrorCode {
     NOT_SCHEDULED_MEETING(HttpStatus.BAD_REQUEST, "미리 약속한 모양(예약 모임)만 입장 기록을 남길 수 있어요."),
     NOT_ENOUGH_PARTICIPANTS(HttpStatus.CONFLICT, "방장을 포함해 2명 이상 모여야 시작할 수 있어요."),
     ENTER_NOT_OPEN(HttpStatus.CONFLICT, "아직 입장할 수 있는 시간이 아니에요. 시작 5분 전부터 입장할 수 있어요."),
+    MEETING_NOT_IN_PROGRESS(HttpStatus.CONFLICT, "진행 중인 모임이 아니에요."),
+    DRAWING_NOT_OPEN(HttpStatus.CONFLICT, "그림은 주제가 나온 뒤(그림 단계)부터 올릴 수 있어요."),
+    NO_SKIP_PERMISSION(HttpStatus.FORBIDDEN, "다음 단계로 넘길 수 있는 사람이 아니에요."),
+    LAST_PHASE(HttpStatus.CONFLICT, "이미 마지막 단계예요."),
     ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없어요."),
 

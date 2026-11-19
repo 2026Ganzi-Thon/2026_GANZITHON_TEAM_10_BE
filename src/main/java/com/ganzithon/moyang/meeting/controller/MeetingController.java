@@ -3,6 +3,9 @@ package com.ganzithon.moyang.meeting.controller;
 import com.ganzithon.moyang.common.port.Ports.CurrentUserProvider;
 import com.ganzithon.moyang.common.response.ApiResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CancelMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.ChatPollResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.SendMessageRequest;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.SendMessageResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.LeaveMeetingResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CreateMeetingRequest;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.CreateMeetingResponse;
@@ -12,9 +15,14 @@ import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingDetailResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MeetingListResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.MyMeetingsResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.EnterMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.EndMeetingResponse;
+import com.ganzithon.moyang.meeting.dto.MeetingDtos.PhaseNextResponse;
 import com.ganzithon.moyang.meeting.dto.MeetingDtos.StartMeetingResponse;
+import com.ganzithon.moyang.meeting.service.MeetingChatService;
 import com.ganzithon.moyang.meeting.service.MeetingCommandService;
+import com.ganzithon.moyang.meeting.service.MeetingEndService;
 import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
+import com.ganzithon.moyang.meeting.service.MeetingPhaseService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,14 +41,74 @@ public class MeetingController {
     private final MeetingQueryService query;
     private final MeetingCommandService command;
     private final MeetingLifecycleService lifecycle;
+    private final MeetingChatService chat;
+    private final MeetingPhaseService phases;
+    private final MeetingEndService ending;
     private final CurrentUserProvider currentUser;
 
     public MeetingController(MeetingQueryService query, MeetingCommandService command,
-                             MeetingLifecycleService lifecycle, CurrentUserProvider currentUser) {
+                             MeetingLifecycleService lifecycle, MeetingChatService chat,
+                             MeetingPhaseService phases, MeetingEndService ending,
+                             CurrentUserProvider currentUser) {
         this.query = query;
         this.command = command;
         this.lifecycle = lifecycle;
+        this.chat = chat;
+        this.phases = phases;
+        this.ending = ending;
         this.currentUser = currentUser;
+    }
+
+    @Operation(summary = "대화 종료 동의",
+            description = "'대화 종료' 버튼. 진행 중(IN_PROGRESS)인 모임에서 참여자 전원이 누르면 모임이 종료(status=ENDED)된다. "
+                    + "같은 사람이 여러 번 눌러도 1번으로 세고, 눌렀다가 취소하거나 강제로 종료하는 기능은 없다. "
+                    + "전원이 동의하는 순간 채팅에 안내(SYSTEM)가 남고, 종료가 확정된 뒤 참여자별 회고 카드가 서버에서 따로 만들어진다"
+                    + "(AI 호출이라 몇 초~수십 초 걸릴 수 있고, 실패해도 종료는 유지된다). 카드는 "
+                    + "GET /api/meetings/{id}/reflection으로 가져오고, 만드는 동안에는 404 NO_DRAWING_IN_MEETING이 오니 몇 초 간격으로 다시 부른다. "
+                    + "이미 종료된 모임에서 동의한 사람이 다시 눌러도 오류 없이 현재 상태를 돌려준다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_JOINED(403, 참여자가 아님), MEETING_NOT_IN_PROGRESS(409).")
+    @PostMapping("/{meetingId}/end")
+    public ApiResponse<EndMeetingResponse> end(@PathVariable long meetingId) {
+        return ApiResponse.ok(ending.end(currentUser.currentUserId(), meetingId));
+    }
+
+    @Operation(summary = "주제 건너뛰기 (다음 단계로)",
+            description = "진행 단계를 하나 넘긴다(INTRO → DRAWING → SHARING → CLOSING). 권한자만: 실시간은 방장, 예약은 방장이 입장해 있으면 방장, "
+                    + "방장 없이 시작했다면 가장 먼저 입장한 사람(상세 조회의 canSkip). 단계가 바뀌면 채팅에 안내(SYSTEM) 메시지가 남는다. "
+                    + "그림 단계(DRAWING)에서 참여자 모두가 그림을 올리면 서버가 자동으로 SHARING으로 넘기므로 버튼은 필요 없다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_PARTICIPANT(403), MEETING_NOT_IN_PROGRESS(409), "
+                    + "NO_SKIP_PERMISSION(403), LAST_PHASE(409, 이미 마무리 단계).")
+    @PostMapping("/{meetingId}/phase/next")
+    public ApiResponse<PhaseNextResponse> nextPhase(@PathVariable long meetingId) {
+        return ApiResponse.ok(phases.next(currentUser.currentUserId(), meetingId));
+    }
+
+    @Operation(summary = "모임 채팅 보내기 · 그림 공유",
+            description = "type=TEXT는 content 필수(500자 이하), type=DRAWING은 내가 올린 drawingId 필수이고 content는 그림 설명(선택). "
+                    + "그림은 먼저 POST /api/drawings로 올리고 받은 drawingId만 보낸다. 진행 중(IN_PROGRESS)인 모임의 참여자만 보낼 수 있고 "
+                    + "모임 채팅에서는 위기 감지를 하지 않는다. "
+                    + "오류: INVALID_MESSAGE_TYPE · EMPTY_CONTENT · CONTENT_TOO_LONG · INVALID_REQUEST(400), "
+                    + "MEETING_NOT_FOUND(404, 없거나 종료 24시간 뒤 삭제), NOT_PARTICIPANT(403), "
+                    + "MEETING_NOT_IN_PROGRESS(409), DRAWING_NOT_OPEN(409, 자기소개 단계(INTRO)에서는 그림 공유 불가), "
+                    + "FORBIDDEN(403, 내 그림이 아님), DRAWING_NOT_FOUND(404).")
+    @PostMapping("/{meetingId}/messages")
+    public ApiResponse<SendMessageResponse> sendMessage(@PathVariable long meetingId,
+                                                        @RequestBody SendMessageRequest request) {
+        return ApiResponse.ok(chat.send(currentUser.currentUserId(), meetingId, request));
+    }
+
+    @Operation(summary = "모임 채팅 조회 (3초 폴링)",
+            description = "afterId보다 뒤의 메시지만(처음에는 생략하면 전체). 응답에 모임 진행 정보도 같이 온다: "
+                    + "status(RECRUITING·OPEN·IN_PROGRESS·ENDED·CANCELED), phase(INTRO·DRAWING·SHARING·CLOSING, 시작 전 null), "
+                    + "currentStep(1~4), topic, submittedDrawingCount/participantCount, endAgreedCount(종료 동의한 사람 수)/endAgreed(내가 동의했는지), endAt, deleteAt(종료 24시간 뒤). "
+                    + "프론트는 폴링으로 status가 IN_PROGRESS·CANCELED·ENDED로 바뀐 것을 알아채 화면을 옮긴다(대기실에서도 호출 가능). "
+                    + "type: TEXT 일반 채팅 · DRAWING 그림 공유(imageUrl은 인증 토큰이 필요한 상대경로) · SYSTEM 안내(sender 없음). "
+                    + "응답에 userId는 없고 모임 닉네임(senderNickname)만 있다. "
+                    + "오류: MEETING_NOT_FOUND(404), NOT_PARTICIPANT(403).")
+    @GetMapping("/{meetingId}/messages")
+    public ApiResponse<ChatPollResponse> messages(@PathVariable long meetingId,
+                                                  @RequestParam(required = false) Long afterId) {
+        return ApiResponse.ok(chat.poll(currentUser.currentUserId(), meetingId, afterId));
     }
 
     @Operation(summary = "모임 만들기",

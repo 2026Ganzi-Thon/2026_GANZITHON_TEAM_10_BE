@@ -129,11 +129,13 @@ class ConversationFlowTest {
         }
 
         @Bean
+        @Primary
         MeetingSharePort meetingSharePort() {
             return (drawingId, id) -> shared;
         }
 
         @Bean
+        @Primary
         MeetingReader meetingReader() {
             return id -> Optional.ofNullable(meeting);
         }

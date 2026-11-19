@@ -11,6 +11,7 @@ import com.ganzithon.moyang.auth.JwtTokenProvider;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingStatus;
 import com.ganzithon.moyang.meeting.repository.MeetingParticipantRepository;
 import com.ganzithon.moyang.meeting.repository.MeetingRepository;
+import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
 import com.ganzithon.moyang.sheep.service.SheepService;
 import com.ganzithon.moyang.user.domain.User;
 import com.ganzithon.moyang.user.repository.UserRepository;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -59,6 +61,8 @@ class MeetingCancelApiTest {
     @Autowired MeetingParticipantRepository participants;
     @Autowired SheepService sheep;
     @Autowired PlatformTransactionManager tx;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired MeetingLifecycleService lifecycle;
 
     MockMvc mvc() {
         return MockMvcBuilders.webAppContextSetup(context).build();
@@ -349,5 +353,72 @@ class MeetingCancelApiTest {
             assertThat(balance(guest)).isEqualTo(1);
             assertThat(balance(host)).isEqualTo(1);
         }
+    }
+
+    // ---------- 자동 취소 직전(시작 시각 + 2분 경과, 아직 스케줄러가 처리하기 전)의 취소 ----------
+
+    /** 시작 시각을 지금 기준으로 옮긴다(양수면 과거). 입장자가 없는 예약 모임이 기다려 주는 시간을 만드는 데 쓴다. */
+    void startedAgo(long meetingId, long minutes) {
+        jdbc.update("update meetings set start_at = ? where id = ?",
+                java.sql.Timestamp.valueOf(LocalDateTime.now(KST).minusMinutes(minutes)), meetingId);
+    }
+
+    @Test
+    void guestLeavingAfterTheWaitExpiredIsRefundedLikeAnAutoCancel() throws Exception {
+        User host = user(1), a = user(1), b = user(1);
+        long id = createMeeting(host, "SCHEDULED", 120);
+        join(a, id);
+        join(b, id);
+        startedAgo(id, 3); // 시작 + 2분이 지났고 입장자는 0명
+
+        leave(a, id).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.refunded").value(true))
+                .andExpect(jsonPath("$.data.sheepRefunded").value(1))
+                .andExpect(jsonPath("$.data.sheepBalance").value(1));
+        assertThat(balance(a)).isEqualTo(1);
+        assertThat(balance(b)).isEqualTo(1);
+        assertThat(balance(host)).isEqualTo(1);
+        assertThat(meetings.findById(id).orElseThrow().getStatus()).isEqualTo(MeetingStatus.CANCELED);
+
+        // 이어서 스케줄러가 돌아도 두 번 환불되지 않는다
+        lifecycle.processDue(LocalDateTime.now(KST));
+        assertThat(balance(a)).isEqualTo(1);
+        assertThat(balance(b)).isEqualTo(1);
+        assertThat(balance(host)).isEqualTo(1);
+    }
+
+    @Test
+    void hostCancelingAfterTheWaitExpiredRefundsEveryoneIncludingHost() throws Exception {
+        User host = user(1), a = user(1), b = user(1);
+        long id = createMeeting(host, "SCHEDULED", 120);
+        join(a, id);
+        join(b, id);
+        startedAgo(id, 3);
+
+        cancel(host, id).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CANCELED"))
+                .andExpect(jsonPath("$.data.refundedParticipantCount").value(2))
+                .andExpect(jsonPath("$.data.hostRefunded").value(true))
+                .andExpect(jsonPath("$.data.sheepBalance").value(1));
+        assertThat(balance(a)).isEqualTo(1);
+        assertThat(balance(b)).isEqualTo(1);
+        assertThat(balance(host)).isEqualTo(1);
+        assertThat(meetings.findById(id).orElseThrow().getCancelReason().name()).isEqualTo("NOT_ENOUGH_PARTICIPANTS");
+
+        lifecycle.processDue(LocalDateTime.now(KST));
+        assertThat(balance(host)).isEqualTo(1);
+    }
+
+    @Test
+    void cancelingBeforeTheWaitExpiredStillFollowsTheNormalRefundRule() throws Exception {
+        User host = user(1), guest = user(1);
+        long id = createMeeting(host, "SCHEDULED", 120);
+        join(guest, id);
+        startedAgo(id, 1); // 시작 시각은 지났지만 기다려 주는 2분 안
+
+        leave(guest, id).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.refunded").value(false));
+        assertThat(balance(guest)).isZero();
+        assertThat(meetings.findById(id).orElseThrow().getStatus()).isEqualTo(MeetingStatus.RECRUITING);
     }
 }

@@ -55,4 +55,5 @@ tasks.named('test') {
     useJUnitPlatform()
     // 테스트 중에는 모임 스케줄러를 끄고, 필요한 테스트가 직접 호출한다
     systemProperty 'moyang.meeting.scheduler.enabled', 'false'
+    systemProperty 'moyang.meeting.card-async', 'false'
 }

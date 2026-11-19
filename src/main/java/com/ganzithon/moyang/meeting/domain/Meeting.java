@@ -144,6 +144,20 @@ public class Meeting {
         this.startedAt = now;
     }
 
+    /** 진행 단계를 하나 앞으로 옮긴다. 마지막 단계에서는 아무것도 하지 않고 false를 돌려준다. */
+    public boolean advancePhase() {
+        if (phase == null || phase.isLast()) {
+            return false;
+        }
+        this.phase = phase.next();
+        return true;
+    }
+
+    /** 모임을 종료한다(참여자 전원이 대화 종료에 동의했을 때). */
+    public void end(LocalDateTime now) {
+        changeStatus(MeetingStatus.ENDED, now);
+    }
+
     public void cancel(CancelReason reason, LocalDateTime now) {
         this.cancelReason = reason;
         changeStatus(MeetingStatus.CANCELED, now);
