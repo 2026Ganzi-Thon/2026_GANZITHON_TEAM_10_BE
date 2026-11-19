@@ -16,6 +16,7 @@ import com.ganzithon.moyang.meeting.domain.MeetingParticipant;
 import com.ganzithon.moyang.meeting.repository.MeetingParticipantRepository;
 import com.ganzithon.moyang.meeting.repository.MeetingRepository;
 import com.ganzithon.moyang.meeting.service.MeetingLifecycleService;
+import com.ganzithon.moyang.meeting.service.MeetingPurgeService;
 import com.ganzithon.moyang.meeting.service.MeetingQueryService;
 import com.ganzithon.moyang.meeting.service.MeetingScheduler;
 import com.ganzithon.moyang.sheep.service.SheepService;
@@ -74,6 +75,7 @@ class MeetingStartApiTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MeetingLifecycleService lifecycle;
     @Autowired MeetingQueryService time;
+    @Autowired MeetingPurgeService purge;
 
     MockMvc mvc() {
         return MockMvcBuilders.webAppContextSetup(context).build();
@@ -457,7 +459,7 @@ class MeetingStartApiTest {
 
         // 서버를 다시 켠 것처럼 스케줄러를 새로 만들어 여러 번 돌려도 아무것도 바뀌지 않는다
         for (int i = 0; i < 3; i++) {
-            new MeetingScheduler(lifecycle, time).runOnce();
+            new MeetingScheduler(lifecycle, time, purge).runOnce();
         }
 
         Meeting s1 = load(started), c1 = load(canceled);

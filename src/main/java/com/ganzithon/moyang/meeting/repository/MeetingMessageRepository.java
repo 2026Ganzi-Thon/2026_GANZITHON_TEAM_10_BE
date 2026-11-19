@@ -1,11 +1,13 @@
 package com.ganzithon.moyang.meeting.repository;
 
+import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingStatus;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MeetingType;
 import com.ganzithon.moyang.meeting.domain.MeetingEnums.MessageType;
 import com.ganzithon.moyang.meeting.domain.MeetingMessage;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,6 +25,12 @@ public interface MeetingMessageRepository extends JpaRepository<MeetingMessage, 
     default long countDrawingSubmitters(long meetingId) {
         return countDistinctSenders(meetingId, MessageType.DRAWING);
     }
+
+    /** 종료 시각이 limit보다 이른(공개 기간이 끝난) 모임들의 채팅 메시지를 모두 지운다. 지운 개수를 돌려준다. */
+    @Modifying
+    @Query("delete from MeetingMessage m where m.meetingId in "
+            + "(select mt.id from Meeting mt where mt.status = :ended and mt.endedAt < :limit)")
+    int deleteOfMeetingsEndedBefore(@Param("ended") MeetingStatus ended, @Param("limit") LocalDateTime limit);
 
     /**
      * 이 그림이 사용자가 참여 중인 모임 채팅에 공유돼 있는지 센다. 종료 후 24시간이 지난 방(visibleSince보다 일찍 끝난 모임)은
