@@ -99,6 +99,11 @@ public class Conversation {
         updatedAt = Instant.now();
     }
 
+    /** 대화가 바뀌지 않는 저장(답만 저장)에서도 @Version을 올려, 동시에 겹친 다른 저장 하나를 409로 막는다. */
+    public void touch() {
+        updatedAt = Instant.now();
+    }
+
     public void analyzed(String mainElements, String spatialComposition, String lineExpression,
                          String emotionMeaning) {
         this.mainElements = mainElements;
@@ -128,6 +133,7 @@ public class Conversation {
     public Status getStatus() { return status; }
     public int getQuestionCount() { return questionCount; }
     public int getMaxQuestions() { return maxQuestions; }
+    public long getVersion() { return version; }
     public String getCardWhatISaid() { return cardWhatISaid; }
     public String getCardThoughts() { return cardThoughts; }
     public String getCardTodaysStory() { return cardTodaysStory; }
