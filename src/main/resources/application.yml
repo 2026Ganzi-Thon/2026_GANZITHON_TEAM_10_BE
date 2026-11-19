@@ -28,3 +28,4 @@ moyang:
   demo:
     password: ${DEMO_PASSWORD:}            # 데모 계정 공통 비밀번호. 환경변수로만 받는다(비면 계정을 만들지 않음)
     count: ${DEMO_ACCOUNT_COUNT:6}         # demo1 ~ demoN
+    sheep-balance: ${DEMO_SHEEP_BALANCE:0} # 시연용 양털 목표 잔액(demo1~demoN 지갑을 이 값까지 채움). 0이면 끔. 행사 후 환경변수를 지운다
