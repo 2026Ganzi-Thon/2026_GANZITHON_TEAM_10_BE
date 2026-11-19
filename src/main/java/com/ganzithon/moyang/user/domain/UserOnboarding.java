@@ -7,6 +7,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 사용자의 온보딩 답. 사용자마다 한 줄(userId가 PK)이고, 다시 저장하면 통째로 덮어쓴다.
@@ -17,6 +18,7 @@ import java.util.List;
 public class UserOnboarding {
 
     private static final String SEPARATOR = ",";
+    private static final String THEME_DIRECT = "DIRECT";
 
     @Id
     private Long userId;
@@ -70,7 +72,10 @@ public class UserOnboarding {
     public void overwrite(Integer birthYear, String gender, String artExperience, String themeCode,
                           String themeText, String lifeStatus, String lifeStatusText,
                           List<String> emotions, String emotionText, String extraStory, LocalDateTime now) {
-        if (this.themeCode == null || !this.themeCode.equals(themeCode)) {
+        // 직접 입력(DIRECT)은 코드가 늘 같아서, 입력한 글이 바뀌면 다른 고민을 고른 것으로 본다
+        boolean themeChanged = this.themeCode == null || !this.themeCode.equals(themeCode)
+                || (THEME_DIRECT.equals(themeCode) && !Objects.equals(this.themeText, themeText));
+        if (themeChanged) {
             this.themeSelectedAt = now;
         }
         this.birthYear = birthYear;

@@ -116,8 +116,9 @@ public class OnboardingService {
         if (s == null) {
             return null;
         }
-        String t = s.trim();
-        return t.isEmpty() ? null : t;
+        // strip()은 전각 공백(U+3000) 같은 유니코드 공백도 지운다. trim()은 못 지운다.
+        String t = s.strip();
+        return t.isBlank() ? null : t;
     }
 
     /** 글자 수는 이모지 같은 문자도 1자로 센다. */

@@ -101,6 +101,12 @@ class ShapesApiTest {
                 .content("{\"themeCode\":\"" + themeCode + "\"}")).andExpect(status().isOk());
     }
 
+    ResultActions putDirect(User u, String text) throws Exception {
+        return mvc().perform(put("/api/users/me/onboarding").header("Authorization", bearer(u))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"themeCode\":\"DIRECT\",\"themeText\":\"" + text + "\"}")).andExpect(status().isOk());
+    }
+
     ResultActions getShape(User u) throws Exception {
         return mvc().perform(get("/api/shapes/me").header("Authorization", bearer(u)));
     }
@@ -219,6 +225,28 @@ class ShapesApiTest {
         clock.advance(Duration.ofMinutes(1));
         onboard(u, "MONEY");
         getShape(u).andExpect(jsonPath("$.data.themeCode").value("MONEY"))
+                .andExpect(jsonPath("$.data.completedRounds").value(0))
+                .andExpect(jsonPath("$.data.nextRound").value(1));
+    }
+
+    /** PR #13 리뷰: 직접 입력(DIRECT)은 코드가 같아도 글이 바뀌면 새 고민이라 회차가 처음부터 다시 시작한다. */
+    @Test
+    void changingTheDirectConcernTextStartsOverButSavingTheSameTextDoesNot() throws Exception {
+        User u = newUser();
+        putDirect(u, "취업 고민");
+        clock.advance(Duration.ofMinutes(1));
+        saveRecord(u);
+        clock.advance(Duration.ofMinutes(1));
+        saveRecord(u);
+        getShape(u).andExpect(jsonPath("$.data.completedRounds").value(2));
+
+        clock.advance(Duration.ofMinutes(1));
+        putDirect(u, "  취업 고민 "); // 앞뒤 공백만 다름 → 같은 고민
+        getShape(u).andExpect(jsonPath("$.data.completedRounds").value(2));
+
+        clock.advance(Duration.ofMinutes(1));
+        putDirect(u, "가족 고민");
+        getShape(u).andExpect(jsonPath("$.data.themeName").value("가족 고민"))
                 .andExpect(jsonPath("$.data.completedRounds").value(0))
                 .andExpect(jsonPath("$.data.nextRound").value(1));
     }

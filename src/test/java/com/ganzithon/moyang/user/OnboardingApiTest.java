@@ -177,6 +177,23 @@ class OnboardingApiTest {
                 .andExpect(jsonPath("$.data.onboarding.themeText").value("반려견 걱정"));
     }
 
+    /** PR #13 리뷰: 전각 공백(U+3000)만 있는 글은 빈 글로 보고, 앞뒤 전각 공백은 지운다. */
+    @Test
+    void fullWidthSpacesAreStrippedLikeOrdinarySpaces() throws Exception {
+        User u = newUser("ob-fullwidth");
+        expectError(putJson(u, "{\"themeCode\": \"DIRECT\", \"themeText\": \"\\u3000\\u3000\"}"),
+                400, "INVALID_REQUEST");
+        expectError(putJson(u, "{\"themeCode\": \"DIRECT\", \"themeText\": \" \\u3000 \"}"),
+                400, "INVALID_REQUEST");
+        expectError(putJson(u, "{\"themeCode\": \"LOVE\", \"lifeStatus\": \"ETC\", \"lifeStatusText\": \"\\u3000\"}"),
+                400, "INVALID_REQUEST");
+        putJson(u, "{\"themeCode\": \"DIRECT\", \"themeText\": \"\\u3000반려견 걱정\\u3000\","
+                + " \"extraStory\": \"\\u3000\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.onboarding.themeText").value("반려견 걱정"))
+                .andExpect(jsonPath("$.data.onboarding.extraStory").doesNotExist());
+    }
+
     @Test
     void etcLifeStatusAndDirectEmotionNeedTheirTexts() throws Exception {
         User u = newUser("ob-direct-texts");
