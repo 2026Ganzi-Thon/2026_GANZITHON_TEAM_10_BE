@@ -41,7 +41,7 @@ public enum ErrorCode {
     INVALID_OPTION_CODE(HttpStatus.BAD_REQUEST, "없는 선택지 코드예요."),
     INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "정원은 2명, 4명, 6명 중에서 골라 주세요."),
     START_AT_REQUIRED(HttpStatus.BAD_REQUEST, "미리 약속한 모양은 시작 시각이 필요해요."),
-    INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "모임 닉네임은 2자 이상 15자 이하로 써 주세요."),
+    INVALID_NICKNAME(HttpStatus.BAD_REQUEST, "닉네임은 2자 이상 15자 이하로 써 주세요."),
     MEETING_FULL(HttpStatus.CONFLICT, "정원이 다 찬 모임이에요."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "이미 신청한 모임이에요."),
     MEETING_NOT_JOINABLE(HttpStatus.CONFLICT, "이미 시작했거나 끝난, 신청할 수 없는 모임이에요."),
@@ -55,6 +55,7 @@ public enum ErrorCode {
     NOT_ENOUGH_PARTICIPANTS(HttpStatus.CONFLICT, "방장을 포함해 2명 이상 모여야 시작할 수 있어요."),
     ENTER_NOT_OPEN(HttpStatus.CONFLICT, "아직 입장할 수 있는 시간이 아니에요. 시작 5분 전부터 입장할 수 있어요."),
     ONBOARDING_NOT_COMPLETED(HttpStatus.CONFLICT, "온보딩을 먼저 완료해 주세요."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없어요."),
 
     // record
     RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요."),

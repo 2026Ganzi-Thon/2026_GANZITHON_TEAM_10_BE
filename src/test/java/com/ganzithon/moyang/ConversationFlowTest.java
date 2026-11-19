@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.ganzithon.moyang.ai.client.AiClient;
+import com.ganzithon.moyang.ai.repository.ConversationMessageRepository;
 import com.ganzithon.moyang.common.exception.BusinessException;
 import com.ganzithon.moyang.common.exception.ErrorCode;
 import com.ganzithon.moyang.common.port.Ports.CurrentUserProvider;
@@ -31,7 +32,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +44,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -65,6 +70,8 @@ class ConversationFlowTest {
     static boolean aiFails;
     static boolean aiSaysNeedsSupport;
     static String lastCardPrompt;
+    /** AI 응답을 기다리는 사이에 한 번 실행된다 (같은 대화에 다른 요청이 끼어드는 상황 재현). */
+    static Runnable duringAi;
     static MeetingInfo meeting;
     static final AtomicLong nextRecordId = new AtomicLong(); // 테스트끼리 DB를 공유하므로 초기화하지 않는다
     static final Set<Long> cardReadyRecords = new HashSet<>();
@@ -135,6 +142,11 @@ class ConversationFlowTest {
         @Primary
         AiClient fakeAi() {
             return (system, user, schemaName, schema) -> {
+                Runnable hook = duringAi;
+                duringAi = null;
+                if (hook != null) {
+                    hook.run();
+                }
                 if (aiFails) {
                     throw new IllegalStateException("ai down");
                 }
@@ -154,6 +166,9 @@ class ConversationFlowTest {
     MeetingCardService meetingCards;
     @Autowired
     com.ganzithon.moyang.ai.service.ConversationService conversations;
+    /** 기본은 진짜 리포지토리 그대로. 읽기 사이에 다른 요청을 끼워 넣을 때만 가로챈다 (테스트마다 자동 초기화). */
+    @MockitoSpyBean
+    ConversationMessageRepository messageRepository;
     MockMvc mvc;
 
     @BeforeEach
@@ -166,6 +181,7 @@ class ConversationFlowTest {
         aiFails = false;
         aiSaysNeedsSupport = false;
         lastCardPrompt = null;
+        duringAi = null;
         meeting = null;
     }
 
@@ -377,6 +393,74 @@ class ConversationFlowTest {
                 .andExpect(jsonPath("$.data.supportNotice.actionLabel").value("조금 더 전문적인 상담 받기"));
     }
 
+    /** 스웨거 QA ①: 마지막 무료 답을 연타하면 하나만 저장되고 두 번째는 409. */
+    @Test
+    void 마지막_무료_답_연타는_한_번만_저장된다() throws Exception {
+        uploadOk(null);
+        long conversationId = start(lastDrawingId);
+        for (int i = 1; i <= 4; i++) {
+            answer(conversationId, "답 " + i);
+        }
+        // AI(2차 감지)를 기다리는 사이 같은 답이 한 번 더 들어와 먼저 저장된다
+        duringAi = meanwhile(() -> answer(conversationId, "마지막 답").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isLastQuestion").value(true)));
+        answer(conversationId, "마지막 답").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("CONCURRENT_REQUEST"));
+        assertThat(conversations.detail(userId, conversationId).messages())
+                .filteredOn(m -> "마지막 답".equals(m.content())).hasSize(1);
+    }
+
+    /** 리뷰 ①-2: 이 요청이 대화를 읽은 뒤 · 내역을 읽기 전에 연타한 앞 요청이 먼저 저장해도 409 (중복 답 · 무료 초과 질문 없음). */
+    @Test
+    void 대화와_내역을_읽는_사이에_끼어든_연타도_409() throws Exception {
+        uploadOk(null);
+        long conversationId = start(lastDrawingId);
+        Answer<?> real = Mockito.mockingDetails(messageRepository).getMockCreationSettings().getDefaultAnswer();
+        AtomicBoolean once = new AtomicBoolean(true);
+        Mockito.doAnswer(inv -> {
+            if (once.getAndSet(false)) {
+                answer(conversationId, "답 1").andExpect(status().isOk()); // 앞 요청: 답 1 + 질문 2 저장
+            }
+            return real.answer(inv);
+        }).when(messageRepository).findByConversationIdOrderByIdAsc(conversationId);
+
+        answer(conversationId, "답 1").andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("CONCURRENT_REQUEST"));
+        var messages = conversations.detail(userId, conversationId).messages();
+        assertThat(messages).filteredOn(m -> "답 1".equals(m.content())).hasSize(1);
+        assertThat(messages).hasSize(3); // 질문 1 · 답 1 · 질문 2
+    }
+
+    /** 스웨거 QA ②: 다음 질문이 없는 마지막 답도 AI가 위기를 감지하면 안내가 뜨고 카드 재료에서 빠진다. */
+    @Test
+    void 마지막_무료_답도_AI_위기_감지를_거친다() throws Exception {
+        uploadOk(null);
+        long conversationId = start(lastDrawingId);
+        for (int i = 1; i <= 4; i++) {
+            answer(conversationId, "답 " + i);
+        }
+        aiSaysNeedsSupport = true;
+        answer(conversationId, "이제 다 그만하고 싶어요")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.question").isEmpty())
+                .andExpect(jsonPath("$.data.supportNotice.phone").value("109"));
+        aiSaysNeedsSupport = false;
+        end(conversationId).andExpect(status().isOk());
+        assertThat(lastCardPrompt).contains("답 4").doesNotContain("그만하고 싶어요");
+    }
+
+    /** 스웨거 QA ③: 카드를 만드는 사이 저장된 답이 있으면 서버가 그 답까지 넣어 카드를 다시 만든다 (409 없음). */
+    @Test
+    void 마치는_사이_저장된_답도_카드에_들어간다() throws Exception {
+        uploadOk(null);
+        long conversationId = start(lastDrawingId);
+        answer(conversationId, "첫 답");
+        duringAi = meanwhile(() -> answer(conversationId, "늦게 보낸 답").andExpect(status().isOk()));
+        end(conversationId).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ENDED"));
+        assertThat(lastCardPrompt).contains("첫 답").contains("늦게 보낸 답");
+    }
+
     @Test
     void AI가_실패해도_기본_질문과_기본_카드로_흐름이_이어진다() throws Exception {
         aiFails = true;
@@ -502,6 +586,21 @@ class ConversationFlowTest {
     ResultActions end(long conversationId) throws Exception {
         return mvc.perform(put("/api/conversations/" + conversationId).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"ENDED\"}"));
+    }
+
+    interface Call {
+        void run() throws Exception;
+    }
+
+    /** AssertionError로 감싼다: AI 쪽은 RuntimeException을 삼키고 기본 응답을 내므로, 실패가 묻히지 않게. */
+    static Runnable meanwhile(Call call) {
+        return () -> {
+            try {
+                call.run();
+            } catch (Exception e) {
+                throw new AssertionError(e);
+            }
+        };
     }
 
     static long number(ResultActions result, String path) throws Exception {
