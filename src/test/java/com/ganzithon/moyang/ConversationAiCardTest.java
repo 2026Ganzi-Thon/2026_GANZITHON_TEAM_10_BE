@@ -140,4 +140,28 @@ class ConversationAiCardTest {
                 .contains("whatISaid와 todaysStory는 어떤 경우에도 \"없음\"이라고 쓰지 마")
                 .contains("그 칸에 해당하는 말을 내가 하지 않았으면 정확히 \"없음\"이라고만 써"); // 기존 네 칸 규칙
     }
+
+    // ── 말하지 않은 해석 막기 ──
+
+    @Test
+    void theCardPromptOnlyAllowsFeelingsTheUserActuallySaid() {
+        AtomicReference<String> system = new AtomicReference<>();
+        ai(system, "우산을 쓴 사람을 그렸어요", "없음", "비가 와서 우산 쓴 사람을 그렸어요", "없음", "없음", "없음", "없음")
+                .card(CTX, SAID);
+        assertThat(system.get())
+                .doesNotContain("todaysStory: 오늘의 마음 이야기") // 마음을 지어내게 하던 칸 정의
+                .contains("todaysStory: 내가 한 말 전체를 아우르는 한 줄 정리")
+                .contains("내가 직접 말했을 때만 써")
+                .contains("내가 마음을 말하지 않았으면 todaysStory에는 무엇을 그렸는지만 한 줄로 정리해");
+    }
+
+    @Test
+    void todaysStoryCopyingTheFieldDescriptionGetsTheDefaultSentence() {
+        for (String leaked : new String[] {"오늘의 마음 이야기에요", "매일 걷는 길이 오늘의 마음 이야기예요."}) {
+            Card c = card("우산을 쓴 사람을 그렸어요", "없음", leaked);
+            assertThat(c.fallback()).as("todaysStory=[%s]", leaked).isFalse();
+            assertThat(c.todaysStory()).as("todaysStory=[%s]", leaked).isEqualTo(FALLBACK_STORY);
+            assertThat(c.whatISaid()).isEqualTo("우산을 쓴 사람을 그렸어요"); // 나머지 AI 결과는 그대로
+        }
+    }
 }
