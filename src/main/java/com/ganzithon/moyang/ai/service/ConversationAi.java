@@ -18,6 +18,7 @@ public class ConversationAi {
     private static final Logger log = LoggerFactory.getLogger(ConversationAi.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final int MAX_QUESTION_LENGTH = 300;
+    private static final String DEFAULT_TODAYS_STORY = "그림을 그리고, 그 그림에 대해 이야기해 본 하루였어요.";
 
     /** 질문 관점: 1~2번 그림, 3~4번 생각, 그 뒤는 마음. */
     public enum Aspect {
@@ -84,6 +85,7 @@ public class ConversationAi {
             lineExpression: 선 · 색 · 그리는 방식에 대해 말한 것 / \
             emotionMeaning: 내가 말한 마음(예: 피곤함, 안심)과 이 그림이 나에게 갖는 의미. 그림 설명을 다시 쓰지 마.
             그 칸에 해당하는 말을 내가 하지 않았으면 정확히 "없음"이라고만 써.
+            단, whatISaid와 todaysStory는 어떤 경우에도 "없음"이라고 쓰지 마. 말이 적어도 내가 한 말을 바탕으로 한 줄로 정리해서 써.
             8. 모든 칸은 "~했어요 / ~예요" 체로 써. "~했다" 체를 쓰지 마.
             """;
 
@@ -178,12 +180,18 @@ public class ConversationAi {
             String whatISaid = node.path("whatISaid").asString("").strip();
             String thoughts = node.path("thoughts").asString("").strip();
             String todaysStory = node.path("todaysStory").asString("").strip();
-            if (whatISaid.isEmpty() || todaysStory.isEmpty()) {
+            // whatISaid가 비었거나 "없음"이면 AI 카드를 쓰지 않고 기본 카드로 넘어간다
+            if (whatISaid.isEmpty() || isNoneMarker(whatISaid)) {
                 throw new IllegalStateException("empty card");
+            }
+            // todaysStory만 비었거나 "없음"이면 그 칸에만 기본 문장을 넣고, 나머지 칸과 분석 4칸은 그대로 살린다
+            if (todaysStory.isEmpty() || isNoneMarker(todaysStory)) {
+                todaysStory = DEFAULT_TODAYS_STORY;
             }
             Analysis analysis = new Analysis(textOrNull(node, "mainElements"), textOrNull(node, "spatialComposition"),
                     textOrNull(node, "lineExpression"), textOrNull(node, "emotionMeaning"));
-            return new Card(whatISaid, thoughts.isEmpty() ? null : thoughts, todaysStory, false, analysis);
+            return new Card(whatISaid, thoughts.isEmpty() || isNoneMarker(thoughts) ? null : thoughts,
+                    todaysStory, false, analysis);
         } catch (RuntimeException e) {
             log.warn("AI card failed, using fallback: {}", e.getClass().getSimpleName());
             return fallbackCard(ctx, said);
@@ -196,6 +204,11 @@ public class ConversationAi {
         return value.isEmpty() || value.replaceAll("[\\s.\"']", "").equals("없음") ? null : value;
     }
 
+    /** 모델이 "없음" · "없음." · "'없음'"처럼 적은 자리 표시인지 (공백 · 마침표 · 따옴표는 무시). */
+    private static boolean isNoneMarker(String value) {
+        return value.replaceAll("[\\s.\"']", "").equals("없음");
+    }
+
     /** AI 없이 사용자가 한 말만으로 만드는 카드. */
     private Card fallbackCard(Context ctx, List<String> said) {
         if (said.isEmpty()) {
@@ -205,7 +218,7 @@ public class ConversationAi {
         int split = Math.min(2, said.size());
         String whatISaid = String.join(" ", said.subList(0, split));
         String thoughts = said.size() > split ? String.join(" ", said.subList(split, said.size())) : null;
-        return new Card(whatISaid, thoughts, "그림을 그리고, 그 그림에 대해 이야기해 본 하루였어요.", true);
+        return new Card(whatISaid, thoughts, DEFAULT_TODAYS_STORY, true);
     }
 
     private String questionPrompt(Context ctx, List<Line> history, int order, Aspect aspect) {
