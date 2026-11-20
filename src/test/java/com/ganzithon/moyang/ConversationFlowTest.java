@@ -69,6 +69,8 @@ class ConversationFlowTest {
     static boolean shared;
     static boolean aiFails;
     static boolean aiSaysNeedsSupport;
+    /** 실제 AI처럼 질문 프롬프트의 대화 전체를 보고 판정: 이 문장이 어디든 있으면 needsSupport=true. */
+    static String aiFlagsDialogueContaining;
     static String lastCardPrompt;
     /** AI 응답을 기다리는 사이에 한 번 실행된다 (같은 대화에 다른 요청이 끼어드는 상황 재현). */
     static Runnable duringAi;
@@ -156,7 +158,9 @@ class ConversationFlowTest {
                     lastCardPrompt = user;
                     return "{\"whatISaid\":\"그림 이야기\",\"thoughts\":\"떠오른 생각\",\"todaysStory\":\"오늘의 마음\",\"mainElements\":\"우산 쓴 사람\",\"spatialComposition\":\"가운데에 크게\",\"lineExpression\":\"\",\"emotionMeaning\":\"비를 막고 싶은 마음\"}";
                 }
-                return "{\"question\":\"어떤 마음이었나요?\",\"needsSupport\":" + aiSaysNeedsSupport
+                boolean needsSupport = aiSaysNeedsSupport
+                        || (aiFlagsDialogueContaining != null && user.contains(aiFlagsDialogueContaining));
+                return "{\"question\":\"어떤 마음이었나요?\",\"needsSupport\":" + needsSupport
                         + ",\"aspect\":\"DRAWING\"}";
             };
         }
@@ -182,6 +186,7 @@ class ConversationFlowTest {
         shared = false;
         aiFails = false;
         aiSaysNeedsSupport = false;
+        aiFlagsDialogueContaining = null;
         lastCardPrompt = null;
         duringAi = null;
         meeting = null;
@@ -351,6 +356,32 @@ class ConversationFlowTest {
                         .content("{\"status\":\"DONE\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("INVALID_STATUS"));
         mvc.perform(get("/api/conversations/999999")).andExpect(status().isNotFound());
+    }
+
+    /** 프론트 제보: 위기 안내 뒤 평범한 답에도 안내만 반복됨. 앞선 위기 답이 다음 질문용 대화에 남아 AI가 계속 위기로 판정했다. */
+    @Test
+    void 위기_안내_뒤_평범한_답에는_다음_질문이_나오고_새_위기_답에는_다시_안내한다() throws Exception {
+        uploadOk(null);
+        long conversationId = start(lastDrawingId);
+        aiFlagsDialogueContaining = "그만하고 싶어요"; // 키워드에 안 걸리는 위기 표현 (AI 2차 감지)
+
+        answer(conversationId, "이제 다 그만하고 싶어요")
+                .andExpect(jsonPath("$.data.question").isEmpty())
+                .andExpect(jsonPath("$.data.supportNotice.phone").value("109"));
+        answer(conversationId, "창밖을 보는 사람을 그렸어요")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.supportNotice").isEmpty())
+                .andExpect(jsonPath("$.data.question.order").value(2));
+        answer(conversationId, "오늘도 다 그만하고 싶어요") // 새 답이 다시 위기면 다시 안내
+                .andExpect(jsonPath("$.data.question").isEmpty())
+                .andExpect(jsonPath("$.data.supportNotice.phone").value("109"));
+        answer(conversationId, "창문을 크게 그렸어요")
+                .andExpect(jsonPath("$.data.supportNotice").isEmpty())
+                .andExpect(jsonPath("$.data.question.order").value(3));
+
+        end(conversationId).andExpect(status().isOk());
+        assertThat(lastCardPrompt).contains("창밖을 보는 사람").contains("창문을 크게")
+                .doesNotContain("그만하고 싶어요"); // 위기 답은 카드 재료에서 계속 빠진다
     }
 
     @Test

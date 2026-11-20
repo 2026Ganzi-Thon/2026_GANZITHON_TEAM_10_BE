@@ -171,7 +171,7 @@ public class ConversationService {
         int order = asked + 1;
         // 다음 질문이 없는 마지막 답도 AI 2차 감지를 거친다 (이때 AI가 만든 질문은 버린다). AI 실패면 키워드 판정만
         Question q = askNext || (!crisis && type == Type.ANSWER)
-                ? ai.nextQuestion(context(drawingOf(c)), lines(history, false), order) : null;
+                ? ai.nextQuestion(context(drawingOf(c)), lines(history), order) : null;
         if (q != null && q.fallback() && type == Type.ANSWER) {
             // AI 2차 감지를 못 해 키워드 판정만 적용됨. 위기 기능 저하를 알 수 있게 남긴다 (대화 내용은 남기지 않는다)
             log.warn("crisis AI check unavailable, keyword only: conversationId={}, question={}", c.getId(), asked);
@@ -232,7 +232,7 @@ public class ConversationService {
         for (int attempt = 1; ; attempt++) {
             List<ConversationMessage> history = messages.findByConversationIdOrderByIdAsc(c.getId());
             Long lastSeenId = lastId(history);
-            Card card = ai.card(ctx, lines(history, true));
+            Card card = ai.card(ctx, lines(history));
             String retryReason;
             try {
                 EndResponse ended = tx.execute(s -> {
@@ -401,14 +401,19 @@ public class ConversationService {
                 c.getEmotionMeaning());
     }
 
-    /** forCard=true면 위기 표현이 담긴 답을 뺀다 (카드에 그대로 적히지 않게). */
-    private List<Line> lines(List<ConversationMessage> history, boolean forCard) {
+    /**
+     * AI에 넘길 대화. 위기 표현이 담긴 답(needsSupport)은 뺀다.
+     * - 카드: 위기 표현이 카드에 그대로 적히지 않게
+     * - 다음 질문: 남아 있으면 AI가 새 답이 평범해도 앞선 위기 답을 보고 계속 needsSupport=true를 줘서
+     *   안내만 반복됐다 (실제 Upstage 10번 중 6번). 빼면 새 답만으로 판정한다
+     */
+    private List<Line> lines(List<ConversationMessage> history) {
         List<Line> lines = new ArrayList<>();
         for (ConversationMessage m : history) {
             if (m.isAi()) {
                 lines.add(new Line(true, m.getContent(), true));
             } else if (m.getType() == Type.ANSWER) {
-                if (!(forCard && m.isNeedsSupport())) {
+                if (!m.isNeedsSupport()) {
                     lines.add(new Line(false, m.getContent(), true));
                 }
             } else {
