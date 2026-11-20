@@ -18,6 +18,7 @@ public class ConversationAi {
     private static final Logger log = LoggerFactory.getLogger(ConversationAi.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final int MAX_QUESTION_LENGTH = 300;
+    private static final String DEFAULT_TODAYS_STORY = "그림을 그리고, 그 그림에 대해 이야기해 본 하루였어요.";
 
     /** 질문 관점: 1~2번 그림, 3~4번 생각, 그 뒤는 마음. */
     public enum Aspect {
@@ -179,9 +180,13 @@ public class ConversationAi {
             String whatISaid = node.path("whatISaid").asString("").strip();
             String thoughts = node.path("thoughts").asString("").strip();
             String todaysStory = node.path("todaysStory").asString("").strip();
-            // whatISaid · todaysStory가 비었거나 "없음"이면 AI 카드를 쓰지 않고 기본 카드로 넘어간다
-            if (whatISaid.isEmpty() || isNoneMarker(whatISaid) || todaysStory.isEmpty() || isNoneMarker(todaysStory)) {
+            // whatISaid가 비었거나 "없음"이면 AI 카드를 쓰지 않고 기본 카드로 넘어간다
+            if (whatISaid.isEmpty() || isNoneMarker(whatISaid)) {
                 throw new IllegalStateException("empty card");
+            }
+            // todaysStory만 비었거나 "없음"이면 그 칸에만 기본 문장을 넣고, 나머지 칸과 분석 4칸은 그대로 살린다
+            if (todaysStory.isEmpty() || isNoneMarker(todaysStory)) {
+                todaysStory = DEFAULT_TODAYS_STORY;
             }
             Analysis analysis = new Analysis(textOrNull(node, "mainElements"), textOrNull(node, "spatialComposition"),
                     textOrNull(node, "lineExpression"), textOrNull(node, "emotionMeaning"));
@@ -213,7 +218,7 @@ public class ConversationAi {
         int split = Math.min(2, said.size());
         String whatISaid = String.join(" ", said.subList(0, split));
         String thoughts = said.size() > split ? String.join(" ", said.subList(split, said.size())) : null;
-        return new Card(whatISaid, thoughts, "그림을 그리고, 그 그림에 대해 이야기해 본 하루였어요.", true);
+        return new Card(whatISaid, thoughts, DEFAULT_TODAYS_STORY, true);
     }
 
     private String questionPrompt(Context ctx, List<Line> history, int order, Aspect aspect) {

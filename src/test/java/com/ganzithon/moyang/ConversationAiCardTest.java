@@ -50,31 +50,40 @@ class ConversationAiCardTest {
                 .card(CTX, SAID);
     }
 
-    // ── todaysStory가 없음·빈 값이면 기본 카드 ──
+    // ── todaysStory가 없음·빈 값이면 그 칸에만 기본 문장 (나머지는 AI가 만든 그대로) ──
 
     @Test
-    void todaysStoryNoneFallsBackToTheDefaultCard() {
-        Card c = card("우산을 쓴 사람을 그렸어요", "비 오는 날이 떠올랐어요", "없음");
-        assertThat(c.fallback()).isTrue();
-        assertThat(c.todaysStory()).isEqualTo(FALLBACK_STORY);
-        assertThat(c.whatISaid()).isEqualTo("우산을 쓴 사람을 그렸어요"); // 사용자가 한 말로 만든 기본 카드
-        assertThat(c.analysis()).isNull();
+    void todaysStoryNoneOnlyThatFieldGetsTheDefaultSentenceAndTheRestIsKept() {
+        Card c = ai(new AtomicReference<>(), "AI가 정리한 한 일", "비 오는 날이 떠올랐어요", "없음",
+                "우산을 그렸어요", "사람이 가운데 있어요", "굵은 선으로 그렸어요", "차분한 마음이에요").card(CTX, SAID);
+        assertThat(c.fallback()).isFalse(); // AI 카드는 그대로
+        assertThat(c.todaysStory()).isEqualTo(FALLBACK_STORY); // 이 칸만 기본 문장
+        assertThat(c.whatISaid()).isEqualTo("AI가 정리한 한 일");
+        assertThat(c.thoughts()).isEqualTo("비 오는 날이 떠올랐어요");
+        assertThat(c.analysis()).isNotNull();
+        assertThat(c.analysis().mainElements()).isEqualTo("우산을 그렸어요");
+        assertThat(c.analysis().spatialComposition()).isEqualTo("사람이 가운데 있어요");
+        assertThat(c.analysis().lineExpression()).isEqualTo("굵은 선으로 그렸어요");
+        assertThat(c.analysis().emotionMeaning()).isEqualTo("차분한 마음이에요");
     }
 
     @Test
     void noneWrittenWithDotsQuotesOrSpacesAlsoCounts() {
         for (String none : new String[] {"없음.", " 없음 ", "\"없음\"", "'없음'", "없 음"}) {
-            Card c = card("우산을 쓴 사람을 그렸어요", "생각", none);
-            assertThat(c.fallback()).as("todaysStory=[%s]", none).isTrue();
+            Card c = card("AI가 정리한 한 일", "생각", none);
+            assertThat(c.fallback()).as("todaysStory=[%s]", none).isFalse();
             assertThat(c.todaysStory()).as("todaysStory=[%s]", none).isEqualTo(FALLBACK_STORY);
+            assertThat(c.whatISaid()).as("todaysStory=[%s]", none).isEqualTo("AI가 정리한 한 일");
         }
     }
 
     @Test
-    void emptyTodaysStoryStillFallsBack() {
-        Card c = card("우산을 쓴 사람을 그렸어요", "생각", "   ");
-        assertThat(c.fallback()).isTrue();
+    void emptyTodaysStoryAlsoGetsTheDefaultSentenceWithoutFallingBack() {
+        Card c = card("AI가 정리한 한 일", "생각", "   ");
+        assertThat(c.fallback()).isFalse();
         assertThat(c.todaysStory()).isEqualTo(FALLBACK_STORY);
+        assertThat(c.whatISaid()).isEqualTo("AI가 정리한 한 일");
+        assertThat(c.thoughts()).isEqualTo("생각");
     }
 
     @Test
